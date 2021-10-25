@@ -22,9 +22,6 @@ public class DirectedGraph {
         }
     }
 
-    DirectedGraph() {
-    }
-
     DirectedGraph(String fileName) {
         try {
             BufferedReader reader = new BufferedReader(new FileReader(fileName));
@@ -54,7 +51,7 @@ public class DirectedGraph {
 
     public DirectedGraph(DirectedGraph that) {
         for (Integer key : that.nodeMap.keySet()) {
-            DirectedNode nodeToCopy = (DirectedNode) that.nodeMap.get(key);
+            DirectedNode nodeToCopy = that.nodeMap.get(key);
             this.nodeMap.put(key, nodeToCopy.clone());
         }
     }
