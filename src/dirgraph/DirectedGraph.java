@@ -247,7 +247,7 @@ public class DirectedGraph {
         Map<Integer, Integer> occurrences = new HashMap<>();
         for (Deque<Integer> cycle : cycles) {
             for (Integer v : cycle) {
-                if (occurrences.containsKey(v)) occurrences.put(v, (int) occurrences.get(v) + 1);
+                if (occurrences.containsKey(v)) occurrences.put(v, occurrences.get(v) + 1);
                 else occurrences.put(v, 1);
             }
         }

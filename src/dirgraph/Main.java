@@ -1,6 +1,8 @@
 package dirgraph;
 
-import java.util.*;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.Set;
 
 public class Main {
 
@@ -15,8 +17,7 @@ public class Main {
         //cycle.stream().filter(c -> graph.isFixed((int) c));
 
         for (Integer v : cycle) {
-            /*
-            Set removedNodes = new HashSet<DirectedNode>();
+            /*Set removedNodes = new HashSet<DirectedNode>();
             DirectedNode removedNode = new DirectedNode((DirectedNode) graph.nodeMap.get(v));
             removedNodes.add(removedNode);
             */
@@ -47,8 +48,10 @@ public class Main {
 
     public static void main(String[] args) {
         DirectedGraph graph = new DirectedGraph(args[0]);
-        for (int i : dfvsSolve(graph)) {
+        for (int i:dfvsSolve(graph)
+             ) {
             System.out.println(i);
         }
+
     }
 }

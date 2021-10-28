@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+
+export LC_NUMERIC="en_US.UTF-8"
+
+File=$1
+# insert your program here	 	
+PROGRAMM_NAME="java -jar $2"
+# allowed time for one instance
+maxSecPerInstance=$3					
+# file to save the results
+result=$4
+optSize=$5
+log=$6
+timef=$7
+
+echo "start verifiying of program $PROGRAMM_NAME and file $File"
+
+run_ce_solver()
+{
+	PROGRAMM_NAME=$1
+	maxSecPerInstance=$2
+	File=$3
+
+
+	overallTime=$(date +%s);
+	now=$(date +%s);
+	elapsed=`expr $now - $overallTime`;
+
+	# start everything in a new process group such that we can kill everything if necessary
+	(setsid time -a -o $timef $PROGRAMM_NAME< $File 1> $log 2>&1) & PID=$!
+
+	# kill processes on exit
+	trap "{ kill -$PID 2>/dev/null; }" TERM
+	trap "{ kill -9 -$PID 2>/dev/null; }" EXIT
+
+	waited=0
+	alive=0
+	disown $PID;
+	kill -0 $PID 2>/dev/null && alive=1;
+	while [ $alive -eq 1 -a $waited -le $maxSecPerInstance ]; do
+		sleep 2;
+		(( waited += 2 ));
+		kill -0 $PID 2>/dev/null || alive=0
+	done
+	
+	if [ $alive -eq 1 ]; then
+		# process still exists, kill it softly, then brutally, if necessary
+		kill -TERM -$PID 2>/dev/null; sleep 1; kill -9 -$PID 2>/dev/null;
+	fi	
+			
+	# remove empty lines
+	for j in $log
+	do
+		sed '/^$/d' $j > $File.out 
+		mv  $File.out $j
+	done
+	k=$(grep -ve "^#" $log | wc -l)
+	recursiveSteps=$(grep -e "#recursive steps:" $log | sed -e 's/.*recursive steps: \([0-9]*\).*/\1/' )
+
+	rm -f $log
+
+	timex=$(cat $timef | awk '/system/{print $3}' | sed -e 's/elapsed//');
+	echo $timex;
+	if [ $alive != 0 ]; then
+		echo -e $File "timelimit reached" >> $result
+	else
+		if [ "$optSize" != "-1" ]; then
+			if [ "$k" != "$optSize" ]; then
+				echo -e $File "\t" $timex "error: solution size $k, optimal solution size $optSize" >> $result
+			else
+	    			echo -e $File "\t" $timex "\t" "$k, correct" "\t" "recursive steps" $recursiveSteps >> $result
+			fi
+		else
+	    		echo -e $File "\t" $timex "\t" $k "\t" "recursive steps" $recursiveSteps >> $result	
+		fi		
+	fi
+
+	rm -f $timef
+}
+
+run_ce_solver "$PROGRAMM_NAME" $maxSecPerInstance $File
+
+
+
+
+
+
+
+
