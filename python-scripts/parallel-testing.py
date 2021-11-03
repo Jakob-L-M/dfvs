@@ -3,6 +3,7 @@ from concurrent.futures import TimeoutError
 import subprocess as sp
 import multiprocessing as mp
 import time
+import os
 
 timeout = 2
 
@@ -29,13 +30,12 @@ if __name__ == '__main__':
 
     files = []
 
-    for line in open("data-list.txt", 'r'):
+    for line in open("python-scripts/data-list.txt", 'r'):
         if not line.startswith("#"):
             files += [line.strip()]
         
-    files = files[:5]
-    count = 8
-    pool = mp.Pool(processes=count)
-    
-    pool.map(worker, files)
+    files = files[:25]
+    for file in files:
+        print('2')
+
     
