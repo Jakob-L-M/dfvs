@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+(java -jar dfvs.jar $1) & pid=$!
+sleep $2
+kill -TERM -$PID 2>/dev/null; sleep 1; kill -9 -$PID 2>/dev/null;
