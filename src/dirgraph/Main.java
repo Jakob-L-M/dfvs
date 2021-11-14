@@ -47,9 +47,18 @@ public class Main {
     }
 
     public static void main(String[] args) {
-        DirectedGraph graph = new DirectedGraph(args[0]);
+        /*DirectedGraph graph = new DirectedGraph(args[0]);
         for (int i:dfvsSolve(graph)
              ) {
+            System.out.println(i);
+        }*/
+    	
+    	DirectedGraph graph = new DirectedGraph("./instances/example.txt");
+    	graph.visualize("Before");
+    	graph = graph.burningBridges();
+    	//System.out.println(graph.hasBridge());
+    	graph.visualize("After");
+        for (int i:dfvsSolve(graph)) {
             System.out.println(i);
         }
 

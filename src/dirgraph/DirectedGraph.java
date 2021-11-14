@@ -9,6 +9,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.*;
 
 
@@ -287,6 +288,33 @@ public class DirectedGraph {
                 frame.addEdge(node.getNodeID(), i);
             }
         }
+    }
+    
+    public DirectedGraph burningBridges() {
+    	DirectedGraph copy = new DirectedGraph(this);
+    	while(copy.hasBridge()) {
+    		for (Integer node : nodeMap.keySet()) {
+        		if (copy.nodeMap.get(node).getIn_degree() == 1 && nodeMap.get(node).getOut_degree() == 1) {
+        			for (Integer innode: copy.nodeMap.get(node).getPreNodes()) {
+        				for (Integer outnode: copy.nodeMap.get(node).getPostNodes()) {
+        					copy.addEdge(innode, outnode);
+            			}
+        			}
+        			copy.removeNode(nodeMap.get(node).getNodeID());
+        		}
+
+        	}
+    	}
+    	return copy;
+    }
+    
+    public boolean hasBridge() {
+    	for (DirectedNode node : nodeMap.values()) {
+    		if (node.getIn_degree() == 1 && node.getOut_degree() == 1) {
+    			return true;
+    		}
+    	}
+    	return false;
     }
 
     public class GraphDraw extends JFrame {
