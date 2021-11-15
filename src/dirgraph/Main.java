@@ -1,3 +1,5 @@
+package dirgraph;
+
 import java.io.IOException;
 import java.util.*;
 
@@ -42,13 +44,12 @@ public class Main {
         return dfvs;
     }
 
-<<<<<<< HEAD
-    public static void main(String[] args) {
-        /*DirectedGraph graph = new DirectedGraph(args[0]);
+    /*public static void main(String[] args) {
+        DirectedGraph graph = new DirectedGraph(args[0]);
         for (int i:dfvsSolve(graph)
              ) {
             System.out.println(i);
-        }*/
+        }
     	
     	DirectedGraph graph = new DirectedGraph("./instances/example.txt");
     	graph.visualize("Before");
@@ -57,9 +58,7 @@ public class Main {
     	graph.visualize("After");
         for (int i:dfvsSolve(graph)) {
             System.out.println(i);
-        }
-=======
-
+        }*/
 
     public static void main(String[] args) throws IOException {
         DirectedGraph graph = new DirectedGraph("resources/small.txt"/*args[0]*/);
@@ -70,7 +69,6 @@ public class Main {
         time += System.nanoTime();
         System.out.println(time);
         //big 207s
->>>>>>> origin/tarjan
 
         /*
         Tarjan tarjan = new Tarjan(graph);
