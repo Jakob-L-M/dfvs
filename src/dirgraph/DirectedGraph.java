@@ -1,15 +1,14 @@
-package dirgraph;
-
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 
-import javax.swing.*;
-import java.awt.*;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+<<<<<<< HEAD
 import java.util.List;
 import java.util.Map.Entry;
+=======
+>>>>>>> origin/tarjan
 import java.util.*;
 
 
@@ -52,7 +51,7 @@ public class DirectedGraph {
 
     public DirectedGraph(DirectedGraph that) {
         for (Integer key : that.nodeMap.keySet()) {
-            DirectedNode nodeToCopy = that.nodeMap.get(key);
+            DirectedNode nodeToCopy = (DirectedNode) that.nodeMap.get(key);
             this.nodeMap.put(key, nodeToCopy.clone());
         }
     }
@@ -73,8 +72,8 @@ public class DirectedGraph {
         }
     }
 
-    public Set<DirectedNode> cleanGraph() {
-        Set<DirectedNode> removedNodes = new HashSet<>();
+    public Stack<DirectedNode> cleanGraph() {
+        Stack<DirectedNode> removedNodes = new Stack<>();
         boolean change = false;
         Set<Integer> nodes = new HashSet<>(nodeMap.keySet());
         for (Integer nid : nodes) {
@@ -82,6 +81,15 @@ public class DirectedGraph {
             if (node.getIn_degree() == 0 || node.getOut_degree() == 0) {
                 removedNodes.add(nodeMap.get(nid));
                 removeNode(nid);
+                change = true;
+            }
+        }
+
+        Tarjan tarjan = new Tarjan(this);
+        for (ArrayList<Integer> scc : tarjan.getSCCs().values()) {
+            if (scc.size() == 1) {
+                removeNode(scc.get(0));
+                System.out.println("removed Tarjan node: " + scc.get(0));
                 change = true;
             }
         }
@@ -98,15 +106,15 @@ public class DirectedGraph {
     }
 
     public boolean addEdge(Integer preID, Integer postID) {
-        DirectedNode preNode = nodeMap.get(preID);
-        DirectedNode postNode = nodeMap.get(postID);
+        DirectedNode preNode = (DirectedNode) nodeMap.get(preID);
+        DirectedNode postNode = (DirectedNode) nodeMap.get(postID);
         return preNode.addPostNode(postID) &&
                 postNode.addPreNode(preID);
     }
 
     public boolean removeEdge(Integer preID, Integer postID) {
-        DirectedNode preNode = nodeMap.get(preID);
-        DirectedNode postNode = nodeMap.get(postID);
+        DirectedNode preNode = (DirectedNode) nodeMap.get(preID);
+        DirectedNode postNode = (DirectedNode) nodeMap.get(postID);
         if (nodeMap.containsKey(preID) && nodeMap.containsKey(postID)) {
             preNode.removePostNode(postID);
             postNode.removePreNode(preID);
@@ -117,7 +125,7 @@ public class DirectedGraph {
 
     public boolean removeNode(Integer nodeID) {
         if (!nodeMap.containsKey(nodeID)) return false;
-        DirectedNode node = nodeMap.get(nodeID);
+        DirectedNode node = (DirectedNode) nodeMap.get(nodeID);
         ArrayList<Integer> neighbours = new ArrayList<>();
         neighbours.addAll(node.getPostNodes());
         neighbours.addAll(node.getPreNodes());
@@ -129,8 +137,8 @@ public class DirectedGraph {
         return true;
     }
 
-    public Set<DirectedNode> removeClean(Integer nodeID) {
-        Set<DirectedNode> removedNodes = new HashSet<>();
+    public Stack<DirectedNode> removeClean(Integer nodeID) {
+        Stack<DirectedNode> removedNodes = new Stack<>();
         removedNodes.add(nodeMap.get(nodeID));
         removeNode(nodeID);
         removedNodes.addAll(cleanGraph());
@@ -147,7 +155,7 @@ public class DirectedGraph {
         }
     }
 
-    public void reconstructNodes(Set<DirectedNode> nodes) {
+    public void reconstructNodes(Stack<DirectedNode> nodes) {
         for (DirectedNode node : nodes) {
             nodeMap.put(node.getNodeID(), node);
         }
@@ -218,7 +226,7 @@ public class DirectedGraph {
             deque.push(start);
             while (!deque.isEmpty()) {
                 int current = deque.peek();
-                if (visited.get(current) != null && !visited.get(current)) {
+                if (visited.get(current) != null && ! visited.get(current)) {
                     visited.put(current, true);
                     DirectedNode currentNode = nodeMap.get(current);
                     if (currentNode.getOut_degree() == 0) deque.pop();
@@ -248,7 +256,7 @@ public class DirectedGraph {
         Map<Integer, Integer> occurrences = new HashMap<>();
         for (Deque<Integer> cycle : cycles) {
             for (Integer v : cycle) {
-                if (occurrences.containsKey(v)) occurrences.put(v, occurrences.get(v) + 1);
+                if (occurrences.containsKey(v)) occurrences.put(v, (int) occurrences.get(v) + 1);
                 else occurrences.put(v, 1);
             }
         }
@@ -274,20 +282,25 @@ public class DirectedGraph {
         return smallCycle;
     }
 
-    public void visualize(String name) {
-
-        GraphDraw frame = new GraphDraw(name);
-
-        frame.setSize(900,900);
-
-        frame.setVisible(true);
-
-        for(DirectedNode node: nodeMap.values()) {
-            frame.addNode(node.getNodeID());
-            for (int i: node.getPostNodes()) {
-                frame.addEdge(node.getNodeID(), i);
+    public int[] findSCCsTarjan() {
+        int unvisited = -1;
+        int nodeCount = 0;
+        int compCount = 0;
+        int[] ids = new int[nodeMap.size()];
+        int[] lowLinks = new int[nodeMap.size()];
+        int[] sccIDs = new int[nodeMap.size()];
+        boolean[] stacked = new boolean[nodeMap.size()];
+        Deque<Integer> stack = new ArrayDeque<>();
+        for (int i = 0; i < nodeMap.size(); i++) ids[i] = unvisited;
+        for (int i = 0; i < nodeMap.size(); i++) {
+            if(ids[i] == unvisited) {
+                stack.push(i);
+                stacked[i] = true;
+                ids[i] = nodeCount;
+                lowLinks[i] = nodeCount++;
             }
         }
+        return lowLinks;
     }
     
     public DirectedGraph burningBridges() {
@@ -317,77 +330,9 @@ public class DirectedGraph {
     	return false;
     }
 
-    public class GraphDraw extends JFrame {
-        int width;
-        int height;
-        int num_vertices;
-
-        Map<Integer, Node> nodes;
-        List<Edge> edges;
-
-        public GraphDraw(String name) {
-            this.setTitle(name);
-            this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            nodes = new HashMap<>();
-            edges = new ArrayList<>();
-            width = 20;
-            height = 20;
-            num_vertices = nodeMap.values().size();
-        }
-
-        class Node {
-            int index;
-            int x,y;
-
-            public Node(int index) {
-                x = 450 - (int) Math.round(350* Math.cos(index*2*Math.PI/num_vertices));
-                y = 450 + (int) Math.round(350* Math.sin(index*2*Math.PI/num_vertices));
-                this.index = index;
-            }
-        }
-
-        class Edge {
-            int i,j;
-
-            public Edge(int ii, int jj) {
-                i = ii;
-                j = jj;
-            }
-        }
-
-        public void addNode(int name) {
-            nodes.put(name, new Node(name));
-            this.repaint();
-        }
-        public void addEdge(int i, int j) {
-            edges.add(new Edge(i,j));
-            this.repaint();
-        }
-
-        public void paint(Graphics g) { // draw the nodes and edges
-            FontMetrics f = g.getFontMetrics();
-            int nodeHeight = Math.max(height, f.getHeight());
-
-            g.setColor(Color.black);
-            for (Edge e : edges) {
-                g.drawLine(nodes.get(e.i).x, nodes.get(e.i).y,
-                        nodes.get(e.j).x, nodes.get(e.j).y);
-                g.setColor(Color.black);
-                g.fillOval((int) Math.floor(0.9*nodes.get(e.i).x + 0.1*nodes.get(e.j).x) - 5, (int) Math.floor(0.9*nodes.get(e.i).y + 0.1*nodes.get(e.j).y) -5, 10, 10);
-            }
-
-            for (Node n : nodes.values()) {
-                int nodeWidth = Math.max(width, f.stringWidth(Integer.toString(n.index))+width/2);
-                g.setColor(Color.white);
-                g.fillOval(n.x-nodeWidth/2, n.y-nodeHeight/2,
-                        nodeWidth, nodeHeight);
-                g.setColor(Color.black);
-                g.drawOval(n.x-nodeWidth/2, n.y-nodeHeight/2,
-                        nodeWidth, nodeHeight);
-
-                g.drawString(String.valueOf(n.index), n.x-f.stringWidth(Integer.toString(n.index))/2,
-                        n.y+f.getHeight()/2);
-            }
-        }
+    public int size() {
+        return nodeMap.size();
     }
+
+
 }
