@@ -5,8 +5,8 @@ import java.util.Set;
 
 public class DirectedNode {
     private final Integer nodeID;
-    private final Set<Integer> preNodes = new HashSet<>();
-    private final Set<Integer> postNodes = new HashSet<>();
+    private Set<Integer> preNodes = new HashSet<>();
+    private Set<Integer> postNodes = new HashSet<>();
     private boolean fixed;
     private int in_degree;
     private int out_degree;
@@ -28,7 +28,7 @@ public class DirectedNode {
     }
 
     public boolean addPreNode(Integer pre) {
-        if (preNodes.add(pre)) {
+        if(preNodes.add(pre)) {
             in_degree++;
             return true;
         }
@@ -36,7 +36,7 @@ public class DirectedNode {
     }
 
     public boolean addPostNode(Integer post) {
-        if (postNodes.add(post)) {
+        if(postNodes.add(post)) {
             out_degree++;
             return true;
         }
@@ -44,7 +44,7 @@ public class DirectedNode {
     }
 
     public boolean removePreNode(Integer pre) {
-        if (preNodes.remove(pre)) {
+        if(preNodes.remove(pre)) {
             in_degree--;
             return true;
         }
@@ -52,7 +52,7 @@ public class DirectedNode {
     }
 
     public boolean removePostNode(Integer post) {
-        if (postNodes.remove(post)) {
+        if(postNodes.remove(post)) {
             out_degree--;
             return true;
         }
@@ -86,14 +86,13 @@ public class DirectedNode {
     public Set<Integer> getPreNodes() {
         return preNodes;
     }
-
     @Override
     public DirectedNode clone() {
         DirectedNode nodeCopy = new DirectedNode(this.nodeID);
-        for (int postNode : this.postNodes) {
+        for(int postNode : this.postNodes) {
             nodeCopy.addPostNode(postNode);
         }
-        for (int preNode : this.preNodes) {
+        for(int preNode : this.preNodes) {
             nodeCopy.addPreNode(preNode);
         }
         return nodeCopy;
@@ -101,7 +100,7 @@ public class DirectedNode {
 
     @Override
     public String toString() {
-        return "Node: " + nodeID + " - in: {" + preNodes.toString() + "}, out: {" + postNodes.toString() + "}";
+        return "Node: " + nodeID + " - in: {" + preNodes.toString() + "}, out: {" + postNodes.toString() +"}";
     }
 }
 
