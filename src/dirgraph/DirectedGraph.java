@@ -48,9 +48,26 @@ public class DirectedGraph {
 
     public DirectedGraph(DirectedGraph that) {
         for (Integer key : that.nodeMap.keySet()) {
-            DirectedNode nodeToCopy = (DirectedNode) that.nodeMap.get(key);
+            DirectedNode nodeToCopy = that.nodeMap.get(key);
             this.nodeMap.put(key, nodeToCopy.clone());
         }
+    }
+
+    public static int findCrossing(Set<Deque<Integer>> cycles) {
+        if (cycles.isEmpty()) return -1;
+        Map<Integer, Integer> occurrences = new HashMap<>();
+        for (Deque<Integer> cycle : cycles) {
+            for (Integer v : cycle) {
+                if (occurrences.containsKey(v)) occurrences.put(v, occurrences.get(v) + 1);
+                else occurrences.put(v, 1);
+            }
+        }
+        for (Integer key : occurrences.keySet()) {
+            if (occurrences.get(key).equals(Collections.max(occurrences.values()))) {
+                return key;
+            }
+        }
+        return -1;
     }
 
     public void fixNode(Integer nodeID) {
@@ -103,15 +120,16 @@ public class DirectedGraph {
     }
 
     public boolean addEdge(Integer preID, Integer postID) {
-        DirectedNode preNode = (DirectedNode) nodeMap.get(preID);
-        DirectedNode postNode = (DirectedNode) nodeMap.get(postID);
+        DirectedNode preNode = nodeMap.get(preID);
+        DirectedNode postNode = nodeMap.get(postID);
         return preNode.addPostNode(postID) &&
                 postNode.addPreNode(preID);
     }
 
+    //TODO Erst get und dann nochmal contains? -> Kürzen?
     public boolean removeEdge(Integer preID, Integer postID) {
-        DirectedNode preNode = (DirectedNode) nodeMap.get(preID);
-        DirectedNode postNode = (DirectedNode) nodeMap.get(postID);
+        DirectedNode preNode = nodeMap.get(preID);
+        DirectedNode postNode = nodeMap.get(postID);
         if (nodeMap.containsKey(preID) && nodeMap.containsKey(postID)) {
             preNode.removePostNode(postID);
             postNode.removePreNode(preID);
@@ -122,10 +140,12 @@ public class DirectedGraph {
 
     public boolean removeNode(Integer nodeID) {
         if (!nodeMap.containsKey(nodeID)) return false;
-        DirectedNode node = (DirectedNode) nodeMap.get(nodeID);
+        DirectedNode node = nodeMap.get(nodeID);
+        //TODO Warum neue ArrayList? Interieren über einzelene (schon fertige) Listen schneller
         ArrayList<Integer> neighbours = new ArrayList<>();
         neighbours.addAll(node.getPostNodes());
         neighbours.addAll(node.getPreNodes());
+        // TODO Object?
         for (Object neighbourID : neighbours) {
             removeEdge(nodeID, (int) neighbourID);
             removeEdge((int) neighbourID, nodeID);
@@ -223,7 +243,7 @@ public class DirectedGraph {
             deque.push(start);
             while (!deque.isEmpty()) {
                 int current = deque.peek();
-                if (visited.get(current) != null && ! visited.get(current)) {
+                if (visited.get(current) != null && !visited.get(current)) {
                     visited.put(current, true);
                     DirectedNode currentNode = nodeMap.get(current);
                     if (currentNode.getOut_degree() == 0) deque.pop();
@@ -246,23 +266,6 @@ public class DirectedGraph {
 
     private Deque<Integer> copyDeque(Deque<Integer> deque) {
         return new ArrayDeque<>(deque);
-    }
-
-    public static int findCrossing(Set<Deque<Integer>> cycles) {
-        if (cycles.isEmpty()) return -1;
-        Map<Integer, Integer> occurrences = new HashMap<>();
-        for (Deque<Integer> cycle : cycles) {
-            for (Integer v : cycle) {
-                if (occurrences.containsKey(v)) occurrences.put(v, (int) occurrences.get(v) + 1);
-                else occurrences.put(v, 1);
-            }
-        }
-        for (Integer key : occurrences.keySet()) {
-            if (occurrences.get(key).equals(Collections.max(occurrences.values()))) {
-                return key;
-            }
-        }
-        return -1;
     }
 
     public Deque<Integer> findBusyCycle() {
@@ -290,7 +293,7 @@ public class DirectedGraph {
         Deque<Integer> stack = new ArrayDeque<>();
         for (int i = 0; i < nodeMap.size(); i++) ids[i] = unvisited;
         for (int i = 0; i < nodeMap.size(); i++) {
-            if(ids[i] == unvisited) {
+            if (ids[i] == unvisited) {
                 stack.push(i);
                 stacked[i] = true;
                 ids[i] = nodeCount;
@@ -299,32 +302,54 @@ public class DirectedGraph {
         }
         return lowLinks;
     }
-    
-    public DirectedGraph burningBridges() {
-    	DirectedGraph copy = new DirectedGraph(this);
-    	while(copy.hasBridge()) {
-    		for (Integer node : nodeMap.keySet()) {
-        		if (copy.nodeMap.get(node).getIn_degree() == 1 && nodeMap.get(node).getOut_degree() == 1) {
-        			for (Integer innode: copy.nodeMap.get(node).getPreNodes()) {
-        				for (Integer outnode: copy.nodeMap.get(node).getPostNodes()) {
-        					copy.addEdge(innode, outnode);
-            			}
-        			}
-        			copy.removeNode(nodeMap.get(node).getNodeID());
-        		}
 
-        	}
-    	}
-    	return copy;
+    /**
+     * Removes all Chains by adding direct edges. Therefor reducing to edge and vertex count by 1 for each Chain
+     *
+     * @return a chain cleaned graph
+     */
+    public DirectedGraph cleaningChains() {
+        // TODO brauchen wir wirklich eine Copy
+        DirectedGraph copy = new DirectedGraph(this);
+        int chainNode = copy.getChain();
+        while (chainNode != -1) {
+            // There is only one node pointing towards the chain Node
+            // This also catches the case: in_degree = out_degree = 1
+            if (copy.nodeMap.get(chainNode).getIn_degree() == 1) {
+                int preNode = copy.nodeMap.get(chainNode).getPreNodes().iterator().next();
+                for (Integer outNode : copy.nodeMap.get(chainNode).getPostNodes()) {
+                    copy.addEdge(preNode, outNode);
+                }
+            }
+            // If in_degree > 1 and out_degree = 1
+            else {
+                int postNode = copy.nodeMap.get(chainNode).getPreNodes().iterator().next();
+                for (Integer inNode : copy.nodeMap.get(chainNode).getPreNodes()) {
+                    copy.addEdge(inNode, postNode);
+                }
+            }
+            // Remove the node from the copy
+            copy.removeNode(chainNode);
+
+            // Call method again to check if all bridges are now gone
+            chainNode = copy.getChain();
+        }
+        return copy;
     }
-    
-    public boolean hasBridge() {
-    	for (DirectedNode node : nodeMap.values()) {
-    		if (node.getIn_degree() == 1 && node.getOut_degree() == 1) {
-    			return true;
-    		}
-    	}
-    	return false;
+
+    /**
+     * Iterates over all nodes and searches for a bridge
+     * Compare to lecture 2 slide 7
+     *
+     * @return Index of bridge node or -1 if no Node was found
+     */
+    public int getChain() {
+        for (DirectedNode node : nodeMap.values()) {
+            if (node.getIn_degree() == 1 || node.getOut_degree() == 1) {
+                return node.getNodeID();
+            }
+        }
+        return -1;
     }
 
     public int size() {
