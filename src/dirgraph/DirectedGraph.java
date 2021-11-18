@@ -86,29 +86,8 @@ public class DirectedGraph {
         }
     }
 
-    public Stack<DirectedNode> cleanGraph() {
-        Stack<DirectedNode> removedNodes = new Stack<>();
-        boolean change = false;
-        Set<Integer> nodes = new HashSet<>(nodeMap.keySet());
-        for (Integer nid : nodes) {
-            DirectedNode node = nodeMap.get(nid);
-            if (node.getIn_degree() == 0 || node.getOut_degree() == 0) {
-                removedNodes.add(nodeMap.get(nid));
-                removeNode(nid);
-                change = true;
-            }
-        }
-
-        Tarjan tarjan = new Tarjan(this);
-        for (ArrayList<Integer> scc : tarjan.getSCCs().values()) {
-            if (scc.size() == 1) {
-                removeNode(scc.get(0));
-                System.out.println("removed Tarjan node: " + scc.get(0));
-                change = true;
-            }
-        }
-        if (change) removedNodes.addAll(cleanGraph());
-        return removedNodes;
+    public void cleanGraph() {
+        cleaningChains();
     }
 
     public boolean addNode(Integer nid) {
@@ -126,13 +105,10 @@ public class DirectedGraph {
                 postNode.addPreNode(preID);
     }
 
-    //TODO Erst get und dann nochmal contains? -> Kürzen?
     public boolean removeEdge(Integer preID, Integer postID) {
-        DirectedNode preNode = nodeMap.get(preID);
-        DirectedNode postNode = nodeMap.get(postID);
         if (nodeMap.containsKey(preID) && nodeMap.containsKey(postID)) {
-            preNode.removePostNode(postID);
-            postNode.removePreNode(preID);
+            nodeMap.get(preID).removePostNode(postID);
+            nodeMap.get(postID).removePreNode(preID);
             return true;
         }
         return false;
@@ -141,24 +117,22 @@ public class DirectedGraph {
     public boolean removeNode(Integer nodeID) {
         if (!nodeMap.containsKey(nodeID)) return false;
         DirectedNode node = nodeMap.get(nodeID);
-        //TODO Warum neue ArrayList? Interieren über einzelene (schon fertige) Listen schneller
-        ArrayList<Integer> neighbours = new ArrayList<>();
-        neighbours.addAll(node.getPostNodes());
-        neighbours.addAll(node.getPreNodes());
-        // TODO Object?
-        for (Object neighbourID : neighbours) {
-            removeEdge(nodeID, (int) neighbourID);
-            removeEdge((int) neighbourID, nodeID);
+
+        for (Integer postID : node.getPostNodes()) {
+            nodeMap.get(postID).removePreNode(nodeID);
+        }
+        for (Integer preNodes: node.getPreNodes()) {
+            nodeMap.get(preNodes).removePostNode(nodeID);
         }
         nodeMap.remove(nodeID);
         return true;
     }
 
-    public Stack<DirectedNode> removeClean(Integer nodeID) {
-        Stack<DirectedNode> removedNodes = new Stack<>();
+    public Set<DirectedNode> removeClean(Integer nodeID) {
+        Set<DirectedNode> removedNodes = new HashSet<>();
         removedNodes.add(nodeMap.get(nodeID));
         removeNode(nodeID);
-        removedNodes.addAll(cleanGraph());
+        //removedNodes.addAll(cleanGraph());
         return removedNodes;
     }
 
@@ -282,59 +256,35 @@ public class DirectedGraph {
         return smallCycle;
     }
 
-    public int[] findSCCsTarjan() {
-        int unvisited = -1;
-        int nodeCount = 0;
-        int compCount = 0;
-        int[] ids = new int[nodeMap.size()];
-        int[] lowLinks = new int[nodeMap.size()];
-        int[] sccIDs = new int[nodeMap.size()];
-        boolean[] stacked = new boolean[nodeMap.size()];
-        Deque<Integer> stack = new ArrayDeque<>();
-        for (int i = 0; i < nodeMap.size(); i++) ids[i] = unvisited;
-        for (int i = 0; i < nodeMap.size(); i++) {
-            if (ids[i] == unvisited) {
-                stack.push(i);
-                stacked[i] = true;
-                ids[i] = nodeCount;
-                lowLinks[i] = nodeCount++;
-            }
-        }
-        return lowLinks;
-    }
-
     /**
      * Removes all Chains by adding direct edges. Therefor reducing to edge and vertex count by 1 for each Chain
      *
      * @return a chain cleaned graph
      */
-    public DirectedGraph cleaningChains() {
-        // TODO brauchen wir wirklich eine Copy
-        DirectedGraph copy = new DirectedGraph(this);
-        int chainNode = copy.getChain();
+    public void cleaningChains() {
+        int chainNode = this.getChain();
         while (chainNode != -1) {
             // There is only one node pointing towards the chain Node
             // This also catches the case: in_degree = out_degree = 1
-            if (copy.nodeMap.get(chainNode).getIn_degree() == 1) {
-                int preNode = copy.nodeMap.get(chainNode).getPreNodes().iterator().next();
-                for (Integer outNode : copy.nodeMap.get(chainNode).getPostNodes()) {
-                    copy.addEdge(preNode, outNode);
+            if (this.nodeMap.get(chainNode).getIn_degree() == 1) {
+                int preNode = this.nodeMap.get(chainNode).getPreNodes().iterator().next();
+                for (Integer outNode : this.nodeMap.get(chainNode).getPostNodes()) {
+                    this.addEdge(preNode, outNode);
                 }
             }
-            // If in_degree > 1 and out_degree = 1
+            // If in_degree > 1 or 0 and out_degree = 1
             else {
-                int postNode = copy.nodeMap.get(chainNode).getPreNodes().iterator().next();
-                for (Integer inNode : copy.nodeMap.get(chainNode).getPreNodes()) {
-                    copy.addEdge(inNode, postNode);
+                int postNode = this.nodeMap.get(chainNode).getPostNodes().iterator().next();
+                for (Integer inNode : this.nodeMap.get(chainNode).getPreNodes()) {
+                    this.addEdge(inNode, postNode);
                 }
             }
             // Remove the node from the copy
-            copy.removeNode(chainNode);
+            this.removeNode(chainNode);
 
             // Call method again to check if all bridges are now gone
-            chainNode = copy.getChain();
+            chainNode = this.getChain();
         }
-        return copy;
     }
 
     /**
@@ -346,6 +296,7 @@ public class DirectedGraph {
     public int getChain() {
         for (DirectedNode node : nodeMap.values()) {
             if (node.getIn_degree() == 1 || node.getOut_degree() == 1) {
+                if (node.getIn_degree() != 0 && node.getOut_degree() != 0)
                 return node.getNodeID();
             }
         }
