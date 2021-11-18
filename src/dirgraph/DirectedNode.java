@@ -8,22 +8,6 @@ public class DirectedNode {
     private Set<Integer> preNodes = new HashSet<>();
     private Set<Integer> postNodes = new HashSet<>();
 
-    public void setPreNodes(Set<Integer> preNodes) {
-        this.preNodes = preNodes;
-    }
-
-    public void setPostNodes(Set<Integer> postNodes) {
-        this.postNodes = postNodes;
-    }
-
-    public void setIn_degree(int in_degree) {
-        this.in_degree = in_degree;
-    }
-
-    public void setOut_degree(int out_degree) {
-        this.out_degree = out_degree;
-    }
-
     private boolean fixed;
     private int in_degree;
     private int out_degree;
