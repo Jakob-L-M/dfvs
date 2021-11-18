@@ -87,7 +87,16 @@ public class DirectedGraph {
     }
 
     public void cleanGraph() {
-        cleaningChains();
+        boolean change = false;
+        Set<Integer> nodes = new HashSet<>(nodeMap.keySet());
+        for (Integer nid : nodes) {
+            DirectedNode node = nodeMap.get(nid);
+            if (node.getIn_degree() == 0 || node.getOut_degree() == 0) {
+                removeNode(nid);
+                change = true;
+            }
+        }
+        if (change) cleanGraph();
     }
 
     public boolean addNode(Integer nid) {
@@ -118,46 +127,14 @@ public class DirectedGraph {
         if (!nodeMap.containsKey(nodeID)) return false;
         DirectedNode node = nodeMap.get(nodeID);
 
-        for (Integer postID : node.getPostNodes()) {
-            nodeMap.get(postID).removePreNode(nodeID);
+        for(Integer preNode : node.getPreNodes()) {
+            nodeMap.get(preNode).getPostNodes().remove(nodeID);
         }
-        for (Integer preNodes: node.getPreNodes()) {
-            nodeMap.get(preNodes).removePostNode(nodeID);
+        for(Integer postNode : node.getPostNodes()) {
+            nodeMap.get(postNode).getPreNodes().remove(nodeID);
         }
         nodeMap.remove(nodeID);
         return true;
-    }
-
-    public Set<DirectedNode> removeClean(Integer nodeID) {
-        Set<DirectedNode> removedNodes = new HashSet<>();
-        removedNodes.add(nodeMap.get(nodeID));
-        removeNode(nodeID);
-        //removedNodes.addAll(cleanGraph());
-        return removedNodes;
-    }
-
-    public void reconstructNode(DirectedNode node) {
-        nodeMap.put(node.getNodeID(), node);
-        for (int preID : node.getPreNodes()) {
-            addEdge(preID, node.getNodeID());
-        }
-        for (int postID : node.getPostNodes()) {
-            addEdge(node.getNodeID(), postID);
-        }
-    }
-
-    public void reconstructNodes(Stack<DirectedNode> nodes) {
-        for (DirectedNode node : nodes) {
-            nodeMap.put(node.getNodeID(), node);
-        }
-        for (DirectedNode node : nodes) {
-            for (int preID : node.getPreNodes()) {
-                addEdge(preID, node.getNodeID());
-            }
-            for (int postID : node.getPostNodes()) {
-                addEdge(node.getNodeID(), postID);
-            }
-        }
     }
 
     @Override
@@ -169,37 +146,6 @@ public class DirectedGraph {
         }
 
         return graphString.toString();
-    }
-
-    public Deque<Integer> findCycle() {
-        HashMap<Integer, Boolean> visited = new HashMap<>();
-        for (Integer i : nodeMap.keySet()) {
-            visited.put(i, false);
-        }
-        for (Integer start : nodeMap.keySet()) {
-            if (visited.get(start)) continue;
-            Deque<Integer> deque = new ArrayDeque<>();
-            deque.push(start);
-            while (!deque.isEmpty()) {
-                int current = deque.peek();
-                if (visited.get(current) != null && !visited.get(current)) {
-                    visited.put(current, true);
-                    DirectedNode currentNode = nodeMap.get(current);
-                    if (currentNode.getOut_degree() == 0) deque.pop();
-                    for (int dest : currentNode.getPostNodes()) {
-                        deque.push(dest);
-                        if (visited.get(dest) != null && visited.get(dest)) {
-                            while (deque.peekLast() != dest) deque.pollLast();
-                            deque.pop();
-                            return deque;
-                        }
-                    }
-                } else {
-                    deque.pop();
-                }
-            }
-        }
-        return null;
     }
 
     //Set to just one cycle!
@@ -255,57 +201,5 @@ public class DirectedGraph {
         }
         return smallCycle;
     }
-
-    /**
-     * Removes all Chains by adding direct edges. Therefor reducing to edge and vertex count by 1 for each Chain
-     *
-     * @return a chain cleaned graph
-     */
-    public void cleaningChains() {
-        int chainNode = this.getChain();
-        while (chainNode != -1) {
-            // There is only one node pointing towards the chain Node
-            // This also catches the case: in_degree = out_degree = 1
-            if (this.nodeMap.get(chainNode).getIn_degree() == 1) {
-                int preNode = this.nodeMap.get(chainNode).getPreNodes().iterator().next();
-                for (Integer outNode : this.nodeMap.get(chainNode).getPostNodes()) {
-                    this.addEdge(preNode, outNode);
-                }
-            }
-            // If in_degree > 1 or 0 and out_degree = 1
-            else {
-                int postNode = this.nodeMap.get(chainNode).getPostNodes().iterator().next();
-                for (Integer inNode : this.nodeMap.get(chainNode).getPreNodes()) {
-                    this.addEdge(inNode, postNode);
-                }
-            }
-            // Remove the node from the copy
-            this.removeNode(chainNode);
-
-            // Call method again to check if all bridges are now gone
-            chainNode = this.getChain();
-        }
-    }
-
-    /**
-     * Iterates over all nodes and searches for a bridge
-     * Compare to lecture 2 slide 7
-     *
-     * @return Index of bridge node or -1 if no Node was found
-     */
-    public int getChain() {
-        for (DirectedNode node : nodeMap.values()) {
-            if (node.getIn_degree() == 1 || node.getOut_degree() == 1) {
-                if (node.getIn_degree() != 0 && node.getOut_degree() != 0)
-                return node.getNodeID();
-            }
-        }
-        return -1;
-    }
-
-    public int size() {
-        return nodeMap.size();
-    }
-
 
 }

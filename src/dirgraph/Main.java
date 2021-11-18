@@ -9,29 +9,24 @@ public class Main {
     public static Set<Integer> dfvsBranch(DirectedGraph graph, int k) {
 
         if (k < 0) return null;
-        //graph.cleanGraph();
+        graph.cleanGraph();
         Set<Integer> dfvs = new HashSet<>();
         Deque<Integer> cycle = graph.findBusyCycle();
 
         if (cycle == null) return dfvs;
-        //cycle.stream().filter(c -> graph.isFixed((int) c));
 
         for (Integer v : cycle) {
-            /*Set removedNodes = new HashSet<DirectedNode>();
-            DirectedNode removedNode = new DirectedNode((DirectedNode) graph.nodeMap.get(v));
-            removedNodes.add(removedNode);
-            */
+            // create a copy
             DirectedGraph graphCopy = new DirectedGraph(graph);
-            //removedNodes.addAll(graph/*Copy*/.removeClean((int) v));
-            graphCopy.removeClean(v);
+
+            // delete a vertex of the circle and branch for here
+            graphCopy.removeNode(v);
             dfvs = dfvsBranch(graphCopy, k - 1);
+
+            // if there is a valid solution in the recursion it will be returned
             if (dfvs != null) {
                 dfvs.add(v);
-                //System.out.println("nodes to delete: " + v + " which is fixed: " + graph.isFixed((int) v));
                 return dfvs;
-            } else {
-                //graph.reconstructNodes(removedNodes);
-                graph.fixNode(v);
             }
         }
         return null;
@@ -47,13 +42,12 @@ public class Main {
     }
 
     public static void main(String[] args) {
-        DirectedGraph graph = new DirectedGraph("instances/synthetic/synth-n_20-m_54-k_8-p_0.2.txt" /*"resources/small.txargs[0]*/);
+        DirectedGraph graph = new DirectedGraph("resources/example.txt"/*args[0]*/);
         System.out.println(graph);
-        graph.cleaningChains();
-        System.out.println(graph);
+        //graph.cleaningChains();
+        //System.out.println(graph);
 
-        for (int i : dfvsSolve(graph)
-        ) {
+        for (int i : dfvsSolve(graph)) {
             System.out.println(i);
         }
 
