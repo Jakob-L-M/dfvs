@@ -9,7 +9,7 @@ public class Main {
     public static Set<Integer> dfvsBranch(DirectedGraph graph, int k) {
 
         if (k < 0) return null;
-        graph.cleanGraph();
+        //graph.cleanGraph();
         Set<Integer> dfvs = new HashSet<>();
         Deque<Integer> cycle = graph.findBusyCycle();
 
@@ -44,8 +44,8 @@ public class Main {
     public static void main(String[] args) {
         DirectedGraph graph = new DirectedGraph("resources/example.txt"/*args[0]*/);
         System.out.println(graph);
-        //graph.cleaningChains();
-        //System.out.println(graph);
+        graph.cleanGraph();
+        System.out.println(graph);
 
         for (int i : dfvsSolve(graph)) {
             System.out.println(i);

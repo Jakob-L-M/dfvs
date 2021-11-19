@@ -87,16 +87,64 @@ public class DirectedGraph {
     }
 
     public void cleanGraph() {
+        cleanChains();
+        //cleanSinksSources();
+    }
+
+    public void cleanSinksSources() {
         boolean change = false;
         Set<Integer> nodes = new HashSet<>(nodeMap.keySet());
         for (Integer nid : nodes) {
             DirectedNode node = nodeMap.get(nid);
             if (node.getIn_degree() == 0 || node.getOut_degree() == 0) {
+                if (node.getPreNodes().contains(node.getNodeID()) || node.getPostNodes().contains(node.getNodeID())) {
+                    continue;
+                }
                 removeNode(nid);
                 change = true;
             }
         }
-        if (change) cleanGraph();
+        if (change) cleanSinksSources();
+    }
+
+    public void cleanChains() {
+        int chainNode = findChain();
+        while (chainNode != -1) {
+            DirectedNode node = nodeMap.get(chainNode);
+
+            if (node.getIn_degree() == 1 && node.getOut_degree() >= 1) {
+                int preNode = node.getPreNodes().iterator().next();
+                for (Integer postNode : node.getPostNodes()) {
+                    addEdge(preNode, postNode);
+                }
+            }
+            // If in_degree > 1 and out_degree == 1
+            else {
+                int postNode = node.getPostNodes().iterator().next();
+                for (Integer preNode : node.getPreNodes()) {
+                    addEdge(preNode, postNode);
+                }
+            }
+            removeNode(chainNode);
+            chainNode = findChain();
+        }
+    }
+
+    public int findChain() {
+        for (DirectedNode node : nodeMap.values()) {
+            if (node.getIn_degree() == 1 && node.getOut_degree() >= 1) {
+                if (node.getPreNodes().iterator().next() != node.getNodeID()) {
+                    return node.getNodeID();
+                }
+            }
+            if (node.getOut_degree() == 1 && node.getIn_degree() >= 1) {
+                if (node.getPostNodes().iterator().next() != node.getNodeID()) {
+                    return node.getNodeID();
+                }
+
+            }
+        }
+        return -1;
     }
 
     public boolean addNode(Integer nid) {
@@ -126,16 +174,29 @@ public class DirectedGraph {
     public boolean removeNode(Integer nodeID) {
         if (!nodeMap.containsKey(nodeID)) return false;
         DirectedNode node = nodeMap.get(nodeID);
-
-        for(Integer preNode : node.getPreNodes()) {
-            nodeMap.get(preNode).getPostNodes().remove(nodeID);
-        }
-        for(Integer postNode : node.getPostNodes()) {
-            nodeMap.get(postNode).getPreNodes().remove(nodeID);
+        ArrayList<Integer> neighbours = new ArrayList<>();
+        neighbours.addAll(node.getPostNodes());
+        neighbours.addAll(node.getPreNodes());
+        for (Object neighbourID : neighbours) {
+            removeEdge(nodeID, (int) neighbourID);
+            removeEdge((int) neighbourID, nodeID);
         }
         nodeMap.remove(nodeID);
         return true;
     }
+    /*
+    if (!nodeMap.containsKey(nodeID)) return false;
+        DirectedNode node = nodeMap.get(nodeID);
+
+        for (Integer preNode : node.getPreNodes()) {
+            nodeMap.get(preNode).removePostNode(nodeID);
+        }
+        for (Integer postNode : node.getPostNodes()) {
+            nodeMap.get(postNode).removePreNode(nodeID);
+        }
+        nodeMap.remove(nodeID);
+        return true;
+     */
 
     @Override
     public String toString() {
