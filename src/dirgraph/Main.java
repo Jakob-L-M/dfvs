@@ -42,11 +42,10 @@ public class Main {
     }
 
     public static void main(String[] args) {
-        DirectedGraph graph = new DirectedGraph("instances/synthetic/synth-n_180-m_804-k_2-p_0.05.txt"/*args[0]*/);
-        System.out.println(graph);
+        DirectedGraph graph = new DirectedGraph("instances/strings.txt");
 
         for (int i : dfvsSolve(graph)) {
-            System.out.println(i);
+            System.out.println(graph.dict.inverse().get(i));
         }
 
     }
