@@ -97,9 +97,11 @@ public class DirectedGraph {
         for (Integer nid : nodes) {
             DirectedNode node = nodeMap.get(nid);
             if (node.getIn_degree() == 0 || node.getOut_degree() == 0) {
+                /*
                 if (node.getPreNodes().contains(node.getNodeID()) || node.getPostNodes().contains(node.getNodeID())) {
                     continue;
                 }
+                */
                 removeNode(nid);
                 change = true;
             }
@@ -133,12 +135,12 @@ public class DirectedGraph {
     public int findChain() {
         for (DirectedNode node : nodeMap.values()) {
             if (node.getIn_degree() == 1 && node.getOut_degree() >= 1) {
-                if (node.getPreNodes().iterator().next() != node.getNodeID()) {
+                if (!node.getPreNodes().iterator().next().equals(node.getNodeID())) {
                     return node.getNodeID();
                 }
             }
             if (node.getOut_degree() == 1 && node.getIn_degree() >= 1) {
-                if (node.getPostNodes().iterator().next() != node.getNodeID()) {
+                if (!node.getPostNodes().iterator().next().equals(node.getNodeID())) {
                     return node.getNodeID();
                 }
 
@@ -250,4 +252,34 @@ public class DirectedGraph {
         return smallCycle;
     }
 
+    public Deque<Integer> findCycle() {
+        HashMap<Integer, Boolean> visited = new HashMap<>();
+        for (Integer i : nodeMap.keySet()) {
+            visited.put(i, false);
+        }
+        for (Integer start : nodeMap.keySet()) {
+            if (visited.get(start)) continue;
+            Deque<Integer> deque = new ArrayDeque<>();
+            deque.push(start);
+            while (!deque.isEmpty()) {
+                int current = deque.peek();
+                if (visited.get(current) != null && !visited.get(current)) {
+                    visited.put(current, true);
+                    DirectedNode currentNode = nodeMap.get(current);
+                    if (currentNode.getOut_degree() == 0) deque.pop();
+                    for (int dest : currentNode.getPostNodes()) {
+                        deque.push(dest);
+                        if (visited.get(dest) != null && visited.get(dest)) {
+                            while (deque.peekLast() != dest) deque.pollLast();
+                            deque.pop();
+                            return deque;
+                        }
+                    }
+                } else {
+                    deque.pop();
+                }
+            }
+        }
+        return null;
+    }
 }
