@@ -88,7 +88,7 @@ public class DirectedGraph {
 
     public void cleanGraph() {
         cleanChains();
-        //cleanSinksSources();
+        cleanSinksSources();
     }
 
     public void cleanSinksSources() {
@@ -174,19 +174,6 @@ public class DirectedGraph {
     public boolean removeNode(Integer nodeID) {
         if (!nodeMap.containsKey(nodeID)) return false;
         DirectedNode node = nodeMap.get(nodeID);
-        ArrayList<Integer> neighbours = new ArrayList<>();
-        neighbours.addAll(node.getPostNodes());
-        neighbours.addAll(node.getPreNodes());
-        for (Object neighbourID : neighbours) {
-            removeEdge(nodeID, (int) neighbourID);
-            removeEdge((int) neighbourID, nodeID);
-        }
-        nodeMap.remove(nodeID);
-        return true;
-    }
-    /*
-    if (!nodeMap.containsKey(nodeID)) return false;
-        DirectedNode node = nodeMap.get(nodeID);
 
         for (Integer preNode : node.getPreNodes()) {
             nodeMap.get(preNode).removePostNode(nodeID);
@@ -196,7 +183,7 @@ public class DirectedGraph {
         }
         nodeMap.remove(nodeID);
         return true;
-     */
+    }
 
     @Override
     public String toString() {
