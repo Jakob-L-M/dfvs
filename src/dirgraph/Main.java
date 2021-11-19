@@ -11,7 +11,7 @@ public class Main {
         if (k < 0) return null;
         graph.cleanGraph();
         Set<Integer> dfvs = new HashSet<>();
-        Deque<Integer> cycle = graph.findBusyCycle();
+        Deque<Integer> cycle = graph.findCycle();
 
         if (cycle == null) return dfvs;
 
@@ -36,16 +36,13 @@ public class Main {
         int k = 0;
         Set<Integer> dfvs = null;
         while (dfvs == null) {
-            System.out.println(k);
             dfvs = dfvsBranch(graph, k++);
         }
         return dfvs;
     }
 
     public static void main(String[] args) {
-        DirectedGraph graph = new DirectedGraph("instances/synthetic/synth-n_40-m_203-k_8-p_0.2.txt"/*args[0]*/);
-        System.out.println(graph);
-        graph.cleanGraph();
+        DirectedGraph graph = new DirectedGraph("instances/synthetic/synth-n_180-m_804-k_2-p_0.05.txt"/*args[0]*/);
         System.out.println(graph);
 
         for (int i : dfvsSolve(graph)) {
