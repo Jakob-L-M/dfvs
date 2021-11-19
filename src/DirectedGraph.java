@@ -1,5 +1,6 @@
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.google.common.collect.Sets;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -296,7 +297,55 @@ public class DirectedGraph implements Comparable<DirectedGraph>{
     public int size() {
         return nodeMap.size();
     }
-
+    
+    public Set<Set<Integer>> findDoubleLinks(){
+    	Set<Set<Integer>> out = new HashSet();
+    	for (Integer node : nodeMap.keySet()) {
+    		if(!getNode(node).getPostNodes().contains(node)) {
+    			for (Integer succ : getNode(node).getPostNodes()) {
+    				if (getNode(succ).getPostNodes().contains(node)){
+    					Set<Integer> tmp = new HashSet();
+    					tmp.add(node);
+    					tmp.add(succ);
+    					out.add(tmp);
+    				}
+    			}
+    		}
+        }
+    	return out;
+    } 
+    
+    public Set<Set<Integer>> findTripleLinks(Set<Set<Integer>> doubles){
+    	Set<Set<Integer>> out = new HashSet();
+    	for(Set<Integer> pair: doubles) {
+    		Set<Integer> temp = findAllOutNodes(pair);
+    		temp.retainAll(findAllInNodes(pair));
+    		for (Integer node: temp) {
+    			Set<Integer> temp2 = new HashSet(pair);
+    			temp2.add(node);
+    			out.add(temp2);
+    		}
+    	}
+		return out;	
+    }
+    
+    public Set<Integer> findAllOutNodes(Set<Integer> nodes){
+    	Set<Integer> out = new HashSet();
+    	for (Integer node: nodes) {
+    		out.addAll(getNode(node).getPostNodes());
+    	}
+    	out.removeAll(nodes);
+    	return out;
+    }
+    
+    public Set<Integer> findAllInNodes(Set<Integer> nodes){
+    	Set<Integer> out = new HashSet();
+    	for (Integer node: nodes) {
+    		out.addAll(getNode(node).getPreNodes());
+    	}
+    	out.removeAll(nodes);
+    	return out;
+    }
 
     @Override
     public int compareTo(DirectedGraph o) {

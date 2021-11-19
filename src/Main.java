@@ -60,7 +60,12 @@ public class Main {
 
     public static void main(String[] args) {
         long time = -System.nanoTime();
-        DirectedGraph graph = new DirectedGraph(/*args[0])*/"instances/synthetic/synth-n_275-m_1958-k_4-p_0.05.txt");
+        DirectedGraph graph = new DirectedGraph(/*args[0])*/"./instances/doubleLinks.txt");
+        Set<Set<Integer>> links = graph.findDoubleLinks();
+        links = graph.findTripleLinks(links);
+        for (Set<Integer> link: links) {
+        	System.out.println(link);
+        }
         time += System.nanoTime();
         for (int i : dfvsSolve(graph)) {
             System.out.println(graph.dict.inverse().get(i));
