@@ -1,5 +1,3 @@
-package dirgraph;
-
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 
@@ -9,7 +7,7 @@ import java.io.IOException;
 import java.util.*;
 
 
-public class DirectedGraph {
+public class DirectedGraph implements Comparable<DirectedGraph>{
     Map<Integer, DirectedNode> nodeMap = new HashMap<>();
     BiMap<String, Integer> dict = HashBiMap.create();
 
@@ -51,6 +49,10 @@ public class DirectedGraph {
             DirectedNode nodeToCopy = that.nodeMap.get(key);
             this.nodeMap.put(key, nodeToCopy.clone());
         }
+    }
+
+    public DirectedGraph() {
+
     }
 
     public static int findCrossing(Set<Deque<Integer>> cycles) {
@@ -281,5 +283,23 @@ public class DirectedGraph {
             }
         }
         return null;
+    }
+
+    public boolean containsNode(Integer u) {
+        return nodeMap.containsKey(u);
+    }
+
+    public DirectedNode getNode(Integer u) {
+        return nodeMap.get(u);
+    }
+
+    public int size() {
+        return nodeMap.size();
+    }
+
+
+    @Override
+    public int compareTo(DirectedGraph o) {
+        return Integer.compare(this.size(), o.size());
     }
 }
