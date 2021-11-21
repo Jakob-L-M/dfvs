@@ -1,6 +1,7 @@
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 
+import javax.sound.midi.SysexMessage;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
@@ -89,9 +90,9 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     }
 
     public Set<Integer> cleanGraph() {
+        Set<Integer> deletedNodes = cleanChains();
         cleanSinksSources();
-        cleanChains();
-        return cleanSelfCircles();
+        return deletedNodes;
     }
 
     public void cleanSinksSources() {
@@ -107,11 +108,13 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         if (change) cleanSinksSources();
     }
 
-    public void cleanChains() {
+    public Set<Integer> cleanChains() {
         int chainNode = findChain();
+        Set<Integer> nodeToDelete = cleanSelfCircles();
+        nodeToDelete.addAll(cleanSelfCircles());
         while (chainNode != -1) {
+            if(nodeMap.get(chainNode).getPostNodes().contains(chainNode)) System.out.println("GEFAHR");
             DirectedNode node = nodeMap.get(chainNode);
-
             if (node.getIn_degree() == 1 && node.getOut_degree() >= 1) {
                 int preNode = node.getPreNodes().iterator().next();
                 for (Integer postNode : node.getPostNodes()) {
@@ -126,8 +129,10 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 }
             }
             removeNode(chainNode);
+            nodeToDelete.addAll(cleanSelfCircles());
             chainNode = findChain();
         }
+        return nodeToDelete;
     }
 
     public int findChain() {
@@ -150,7 +155,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     public Set<Integer> cleanSelfCircles() {
         Set<Integer> nodeToDelete = new HashSet<>();
         for (DirectedNode node : nodeMap.values()) {
-            if (node.getPreNodes().contains(node.getNodeID())) {
+            if (node.getPreNodes().contains(node.getNodeID()) || node.getPostNodes().contains(node.getNodeID())) {
                 nodeToDelete.add(node.getNodeID());
             }
         }

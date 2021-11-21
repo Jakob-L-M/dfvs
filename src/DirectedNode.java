@@ -70,12 +70,21 @@ public class DirectedNode {
         return this.nodeID;
     }
 
+    //temporarily using different methods
+    /*
     public int getIn_degree() {
         return in_degree;
     }
 
     public int getOut_degree() {
         return out_degree;
+    }*/
+    public int getIn_degree() {
+        return preNodes.size();
+    }
+
+    public int getOut_degree() {
+        return postNodes.size();
     }
 
     public Set<Integer> getPostNodes() {
