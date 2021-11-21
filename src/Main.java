@@ -1,36 +1,20 @@
-import java.util.Deque;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
+import java.util.*;
 
 public class Main {
 
     public static Set<Integer> dfvsBranch(DirectedGraph graph, int k) {
 
         if (k < 0) return null;
-        graph.cleanGraph();
+        Set<Integer> selfCycles = graph.cleanGraph();
         Set<Integer> dfvs = new HashSet<>();
-
-        //method fully functional without the following                     TARJAN BEGIN
-        Tarjan tarjan = new Tarjan(graph);
-        Set<DirectedGraph> subGraphs = tarjan.getSCCGraphs();
-        Iterator<DirectedGraph> it = subGraphs.iterator();
-        if (subGraphs.size() > 1) {
-            Set<Integer> dfvs_mult = new HashSet<>();
-            while (it.hasNext() && dfvs_mult.size() <= k){
-                dfvs_mult.addAll(dfvsSolve(it.next()));
-            }
-            if (dfvs_mult.size() <= k) {
-                return dfvs_mult;
-            }
-            else return null;
-        }
-        //                                                                  TARJAN END
 
         Deque<Integer> cycle = graph.findCycle();
 
 
-        if (cycle == null) return dfvs;
+        if (cycle == null) {
+            dfvs.addAll(selfCycles);
+            return dfvs;
+        }
 
         for (Integer v : cycle) {
             // create a copy
@@ -38,11 +22,12 @@ public class Main {
 
             // delete a vertex of the circle and branch for here
             graphCopy.removeNode(v);
-            dfvs = dfvsBranch(graphCopy, k - 1);
+            dfvs = dfvsBranch(graphCopy, k - 1 - selfCycles.size());
 
             // if there is a valid solution in the recursion it will be returned
             if (dfvs != null) {
                 dfvs.add(v);
+                dfvs.addAll(selfCycles);
                 return dfvs;
             }
         }
@@ -50,27 +35,22 @@ public class Main {
     }
 
     public static Set<Integer> dfvsSolve(DirectedGraph graph) {
-        int k = 0;
+        Set<Integer> selfCycle = graph.cleanGraph();
+        int k = selfCycle.size() - 1;
         Set<Integer> dfvs = null;
         while (dfvs == null) {
             dfvs = dfvsBranch(graph, k++);
         }
+        dfvs.addAll(selfCycle);
         return dfvs;
     }
 
     public static void main(String[] args) {
-        long time = -System.nanoTime();
-        DirectedGraph graph = new DirectedGraph(/*args[0])*/"./instances/doubleLinks.txt");
-        Set<Set<Integer>> links = graph.findDoubleLinks();
-        links = graph.findTripleLinks(links);
-        for (Set<Integer> link: links) {
-        	System.out.println(link);
-        }
-        time += System.nanoTime();
-        for (int i : dfvsSolve(graph)) {
+        DirectedGraph graph = new DirectedGraph("./instances/complex/chess-n_700");
+        Set<Integer> solution = dfvsSolve(graph);
+        for (int i : solution) {
             System.out.println(graph.dict.inverse().get(i));
         }
-        System.out.println(time);
-
+        System.out.println("opt k:" + solution.size());
     }
 }
