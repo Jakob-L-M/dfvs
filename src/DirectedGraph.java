@@ -5,6 +5,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 public class DirectedGraph implements Comparable<DirectedGraph>{
@@ -74,7 +75,7 @@ public class DirectedGraph implements Comparable<DirectedGraph>{
 
     public void fixNode(Integer nodeID) {
         DirectedNode node = nodeMap.get(nodeID);
-        node.fixNode();
+        if(node != null) node.fixNode();
     }
 
     public boolean isFixed(Integer nodeID) {
@@ -284,6 +285,59 @@ public class DirectedGraph implements Comparable<DirectedGraph>{
         }
         return null;
     }
+
+    public Deque<Integer> findCycleBFS() {
+        HashMap<Integer, Boolean> visited = new HashMap<>();
+        HashMap<Integer, Integer> parent = new HashMap<>();
+        Deque<Integer> cycle = new ArrayDeque<>();
+        for (Integer i : nodeMap.keySet()) {
+            visited.put(i, false);
+            parent.put(i, -1);
+        }
+        for (Integer start : nodeMap.keySet()) {
+            if (visited.get(start)) continue;
+            Deque<Integer> queue = new ArrayDeque<>();
+            Deque<Integer> tempCycle = new ArrayDeque<>();
+            queue.add(start);
+            visited.put(start, true);
+            while(!queue.isEmpty()) {
+                Integer u = queue.pop();
+                for (Integer v : nodeMap.get(u).getPostNodes()) {
+                    if (!visited.get(v)) {
+                        parent.put(v, u);
+                        visited.put(v, true);
+                        queue.add(v);
+                    }
+                    if (v.equals(start)) {
+
+                        int w = u;
+                        while(w != -1) {
+                            tempCycle.add(w);
+                            w = parent.get(w);
+                        }
+                    }
+                    if (!tempCycle.isEmpty()) break;
+                }
+                if (!tempCycle.isEmpty()) break;
+            }
+            ArrayDeque nodesLeft = new ArrayDeque();
+            if (!cycle.isEmpty()) {
+                for (Integer u : tempCycle) {
+                    if (!isFixed(u)) nodesLeft.add(u);
+                }
+            }
+            else {
+                nodesLeft = (ArrayDeque) tempCycle;
+            }
+            if (cycle.isEmpty() || (cycle.size() > nodesLeft.size() && nodesLeft.size() > 1)) {
+                cycle = nodesLeft;
+            }
+        }
+        if(cycle.isEmpty()) return null;
+        return cycle;
+    }
+
+
 
     public boolean containsNode(Integer u) {
         return nodeMap.containsKey(u);
