@@ -1,6 +1,7 @@
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 
+import javax.sound.midi.SysexMessage;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
@@ -8,7 +9,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 
-public class DirectedGraph implements Comparable<DirectedGraph>{
+public class DirectedGraph implements Comparable<DirectedGraph> {
     Map<Integer, DirectedNode> nodeMap = new HashMap<>();
     BiMap<String, Integer> dict = HashBiMap.create();
 
@@ -28,7 +29,7 @@ public class DirectedGraph implements Comparable<DirectedGraph>{
 
             while ((currentLine = reader.readLine()) != null) {
 
-                if (currentLine.charAt(0) == '#') continue;
+                if (currentLine.contains("#") || currentLine.contains("%") || currentLine.isEmpty()) continue;
                 String[] nodes = currentLine.split(" ");
 
                 // creating a new node if its the first edge of that node
@@ -89,9 +90,10 @@ public class DirectedGraph implements Comparable<DirectedGraph>{
         }
     }
 
-    public void cleanGraph() {
-        cleanChains();
+    public Set<Integer> cleanGraph() {
+        Set<Integer> deletedNodes = cleanChains();
         cleanSinksSources();
+        return deletedNodes;
     }
 
     public void cleanSinksSources() {
@@ -100,11 +102,6 @@ public class DirectedGraph implements Comparable<DirectedGraph>{
         for (Integer nid : nodes) {
             DirectedNode node = nodeMap.get(nid);
             if (node.getIn_degree() == 0 || node.getOut_degree() == 0) {
-                /*
-                if (node.getPreNodes().contains(node.getNodeID()) || node.getPostNodes().contains(node.getNodeID())) {
-                    continue;
-                }
-                */
                 removeNode(nid);
                 change = true;
             }
@@ -112,11 +109,13 @@ public class DirectedGraph implements Comparable<DirectedGraph>{
         if (change) cleanSinksSources();
     }
 
-    public void cleanChains() {
+    public Set<Integer> cleanChains() {
         int chainNode = findChain();
+        Set<Integer> nodeToDelete = cleanSelfCircles();
+        nodeToDelete.addAll(cleanSelfCircles());
         while (chainNode != -1) {
+            if(nodeMap.get(chainNode).getPostNodes().contains(chainNode)) System.out.println("GEFAHR");
             DirectedNode node = nodeMap.get(chainNode);
-
             if (node.getIn_degree() == 1 && node.getOut_degree() >= 1) {
                 int preNode = node.getPreNodes().iterator().next();
                 for (Integer postNode : node.getPostNodes()) {
@@ -131,8 +130,10 @@ public class DirectedGraph implements Comparable<DirectedGraph>{
                 }
             }
             removeNode(chainNode);
+            nodeToDelete.addAll(cleanSelfCircles());
             chainNode = findChain();
         }
+        return nodeToDelete;
     }
 
     public int findChain() {
@@ -150,6 +151,19 @@ public class DirectedGraph implements Comparable<DirectedGraph>{
             }
         }
         return -1;
+    }
+
+    public Set<Integer> cleanSelfCircles() {
+        Set<Integer> nodeToDelete = new HashSet<>();
+        for (DirectedNode node : nodeMap.values()) {
+            if (node.getPreNodes().contains(node.getNodeID()) || node.getPostNodes().contains(node.getNodeID())) {
+                nodeToDelete.add(node.getNodeID());
+            }
+        }
+        for (Integer nodeId : nodeToDelete) {
+            removeNode(nodeId);
+        }
+        return nodeToDelete;
     }
 
     public boolean addNode(Integer nid) {
@@ -194,7 +208,7 @@ public class DirectedGraph implements Comparable<DirectedGraph>{
     public String toString() {
         StringBuilder graphString = new StringBuilder();
 
-        for (Object node : nodeMap.values()) {
+        for (DirectedNode node : nodeMap.values()) {
             graphString.append(node.toString()).append("\n");
         }
 
@@ -351,6 +365,54 @@ public class DirectedGraph implements Comparable<DirectedGraph>{
         return nodeMap.size();
     }
 
+    public Set<Set<Integer>> findDoubleLinks() {
+        Set<Set<Integer>> out = new HashSet();
+        for (Integer node : nodeMap.keySet()) {
+            if (!getNode(node).getPostNodes().contains(node)) {
+                for (Integer succ : getNode(node).getPostNodes()) {
+                    if (getNode(succ).getPostNodes().contains(node)) {
+                        Set<Integer> tmp = new HashSet();
+                        tmp.add(node);
+                        tmp.add(succ);
+                        out.add(tmp);
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    public Set<Set<Integer>> findTripleLinks(Set<Set<Integer>> doubles) {
+        Set<Set<Integer>> out = new HashSet();
+        for (Set<Integer> pair : doubles) {
+            Set<Integer> temp = findAllOutNodes(pair);
+            temp.retainAll(findAllInNodes(pair));
+            for (Integer node : temp) {
+                Set<Integer> temp2 = new HashSet(pair);
+                temp2.add(node);
+                out.add(temp2);
+            }
+        }
+        return out;
+    }
+
+    public Set<Integer> findAllOutNodes(Set<Integer> nodes) {
+        Set<Integer> out = new HashSet();
+        for (Integer node : nodes) {
+            out.addAll(getNode(node).getPostNodes());
+        }
+        out.removeAll(nodes);
+        return out;
+    }
+
+    public Set<Integer> findAllInNodes(Set<Integer> nodes) {
+        Set<Integer> out = new HashSet();
+        for (Integer node : nodes) {
+            out.addAll(getNode(node).getPreNodes());
+        }
+        out.removeAll(nodes);
+        return out;
+    }
 
     @Override
     public int compareTo(DirectedGraph o) {

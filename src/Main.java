@@ -1,7 +1,4 @@
-import java.util.Deque;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
+import java.util.*;
 
 public class Main {
     public static Set<Integer> fixGlobally = new HashSet<>();
@@ -9,8 +6,8 @@ public class Main {
     public static Set<Integer> dfvsBranch(DirectedGraph graph, int k) {
 
         if (k < 0) return null;
-        graph.cleanGraph();
         Set<Integer> dfvs = new HashSet<>();
+
 
         if(k < 5) {
             //method fully functional without the following                     TARJAN BEGIN
@@ -27,12 +24,15 @@ public class Main {
                 } else return null;
             }
         }
-        //                                                                  TARJAN END
 
         Deque<Integer> cycle = graph.findCycleBFS();
 
 
-        if (cycle == null) return dfvs;
+        if (cycle == null && selfCycles.size() <= k) {
+            dfvs.addAll(selfCycles);
+            //System.out.println("Kreisfrei und k ist " + k + ". Es liegen " + selfCycles.size() + " Self-Cycles vor.");
+            return dfvs;
+        }
 
         for (Integer v : cycle) {
             // create a copy
@@ -43,9 +43,12 @@ public class Main {
             recursions++;
             dfvs = dfvsBranch(graphCopy, k - 1);
 
+
             // if there is a valid solution in the recursion it will be returned
             if (dfvs != null) {
                 dfvs.add(v);
+                dfvs.addAll(selfCycles);
+                //System.out.println("k ist: " + k + ". Trotzdem noch " + selfCycles.size() + " + 1 Knoten aus " + selfCycles.toString() + " hinzugefügt.");
                 return dfvs;
             }
             else {
@@ -56,6 +59,8 @@ public class Main {
     }
 
     public static Set<Integer> dfvsSolve(DirectedGraph graph) {
+        Set<Integer> selfCycle = graph.cleanGraph();
+        //System.out.println("Ganz am Anfang " + selfCycle.size() + " Knoten:"+ selfCycle.toString());
         int k = 0;
         Set<Integer> dfvs = null;
         recursions = 0;
@@ -66,6 +71,7 @@ public class Main {
             fixGlobally = new HashSet<>();
             dfvs = dfvsBranch(graph, k++);
         }
+        dfvs.addAll(selfCycle);
         return dfvs;
     }
 
