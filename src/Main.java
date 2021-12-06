@@ -1,25 +1,32 @@
-import java.util.*;
+import java.util.Deque;
+import java.util.List;
+import java.util.Set;
 
 public class Main {
+
+    public static int recursions;
 
     public static Set<Integer> dfvsBranch(DirectedGraph graph, int k) {
 
         if (k < 0) return null;
-        Set<Integer> dfvs = new HashSet<>();
-        //Set<Integer> selfCycles = graph.cleanGraph();
-        Set<Integer> selfCycles = new HashSet<>();
+
+        // clean the graph and save all selfCycle-Nodes that have been removed during cleaning
+        Set<Integer> selfCycles = graph.cleanGraph();
+
+        // If there should be more selfCycles than k, we can break here.
         if (selfCycles.size() > k) {
-            //System.out.println("Does this happen?" + k);
             return null;
         }
 
-        Deque<Integer> cycle = graph.findCycle();
-
+        // find a Cycle
+        Deque<Integer> cycle = graph.findBestCycle();
 
         if (cycle == null && selfCycles.size() <= k) {
-            dfvs.addAll(selfCycles);
-            //System.out.println("Kreisfrei und k ist " + k + ". Es liegen " + selfCycles.size() + " Self-Cycles vor.");
-            return dfvs;
+            // The graph does not have a cycle anymore
+            // We will return the found selfCycles
+            return selfCycles;
+        } else if (cycle == null) {
+            return null;
         }
 
         for (Integer v : cycle) {
@@ -28,7 +35,8 @@ public class Main {
 
             // delete a vertex of the circle and branch for here
             graphCopy.removeNode(v);
-            dfvs = dfvsBranch(graphCopy, k - 1 - selfCycles.size());
+            recursions++;
+            Set<Integer> dfvs = dfvsBranch(graphCopy, k - 1 - selfCycles.size());
             //dfvs = dfvsBranch(graphCopy, k - 1);
 
             // if there is a valid solution in the recursion it will be returned
@@ -44,7 +52,8 @@ public class Main {
 
     public static Set<Integer> dfvsSolve(DirectedGraph graph) {
         Set<Integer> selfCycle = graph.cleanGraph();
-        //System.out.println("Ganz am Anfang " + selfCycle.size() + " Knoten:"+ selfCycle.toString());
+
+        //System.out.println("Anfang: " + selfCycle);
         int k = 0;
         Set<Integer> dfvs = null;
         while (dfvs == null) {
@@ -55,11 +64,10 @@ public class Main {
     }
 
     public static void main(String[] args) {
-        DirectedGraph graph = new DirectedGraph(args[0]);//"./instances/complex/biology-n_13-m_39-p_0.5-4");
-        Set<Integer> solution = dfvsSolve(graph);
-        for (int i : solution) {
-            System.out.println(graph.dict.inverse().get(i));
+        DirectedGraph graph = new DirectedGraph(args[0]);
+        for (int i: dfvsSolve(graph)) {
+            System.out.println(i);
         }
-        //System.out.println("opt k:" + solution.size());
+        System.out.println("#recursive steps: " + recursions);
     }
 }
