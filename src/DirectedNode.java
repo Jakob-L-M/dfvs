@@ -81,7 +81,7 @@ public class DirectedNode {
 
     @Override
     public String toString() {
-        return "Node: " + nodeID + " - in: {" + inNodes.toString() + "}, out: {" + outNodes.toString() +"}";
+        return "Node: " + nodeID + " - in: {" + inNodes + "}, out: {" + outNodes +"}";
     }
 }
 

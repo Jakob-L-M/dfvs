@@ -55,7 +55,7 @@ public class Tarjan {
         stack.push(i);
         stacked[i] = true;
         tarjanIDs[i] = lowLinks[i] = nodeCount++;
-        for(int post : graph.nodeMap.get(realNodeIDs[i]).getPostNodes()) {
+        for(int post : graph.nodeMap.get(realNodeIDs[i]).getOutNodes()) {
             post = dict.get(post);
             if(tarjanIDs[post] == unvisited) tarjanDFS(post);
             if(stacked[post]) lowLinks[i] = Math.min(lowLinks[i], lowLinks[post]);
@@ -100,12 +100,12 @@ public class Tarjan {
             }
             for(Integer u : scc.get(i)) {
                 DirectedNode uNode = graph.getNode(u);
-                for(Integer v : uNode.getPreNodes()) {
+                for(Integer v : uNode.getInNodes()) {
                     if(addGraph.containsNode(v)) {
                         addGraph.addEdge(v, u);
                     }
                 }
-                for(Integer v : uNode.getPostNodes()) {
+                for(Integer v : uNode.getOutNodes()) {
                     if(addGraph.containsNode(v)) {
                         addGraph.addEdge(u, v);
                     }
