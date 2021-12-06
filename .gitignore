@@ -31,5 +31,3 @@ src/META-INF/MANIFEST.MF
 .vscode/
 .project
 *.ipynb
-*.png
-*.json
