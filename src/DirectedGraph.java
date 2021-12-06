@@ -1,7 +1,6 @@
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 
-import javax.sound.midi.SysexMessage;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
@@ -56,113 +55,85 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
     }
 
-    public static int findCrossing(Set<Deque<Integer>> cycles) {
-        if (cycles.isEmpty()) return -1;
-        Map<Integer, Integer> occurrences = new HashMap<>();
-        for (Deque<Integer> cycle : cycles) {
-            for (Integer v : cycle) {
-                if (occurrences.containsKey(v)) occurrences.put(v, occurrences.get(v) + 1);
-                else occurrences.put(v, 1);
-            }
-        }
-        for (Integer key : occurrences.keySet()) {
-            if (occurrences.get(key).equals(Collections.max(occurrences.values()))) {
-                return key;
-            }
-        }
-        return -1;
-    }
-
-    public void fixNode(Integer nodeID) {
-        DirectedNode node = nodeMap.get(nodeID);
-        node.fixNode();
-    }
-
-    public boolean isFixed(Integer nodeID) {
-        DirectedNode node = nodeMap.get(nodeID);
-
-        try {
-            return node.isFixed();
-        } catch (NullPointerException e) {
-            return true;
-            //e.printStackTrace();
-        }
-    }
-
     public Set<Integer> cleanGraph() {
-        Set<Integer> deletedNodes = cleanChains();
+        Set<Integer> deletedNodes = new HashSet<>();
+
         cleanSinksSources();
+        Set<Integer> newDeletedNodes = cleanChains();
+        while (newDeletedNodes.size() != 0) {
+            deletedNodes.addAll(newDeletedNodes);
+            cleanSinksSources();
+            newDeletedNodes = cleanChains();
+        }
+
         return deletedNodes;
     }
 
     public void cleanSinksSources() {
-        boolean change = false;
         Set<Integer> nodes = new HashSet<>(nodeMap.keySet());
         for (Integer nid : nodes) {
             DirectedNode node = nodeMap.get(nid);
-            if (node.getIn_degree() == 0 || node.getOut_degree() == 0) {
-                removeNode(nid);
-                change = true;
+            if (node == null) continue;
+            if (node.isSinkSource()) {
+                removeSinkSource(nid);
             }
         }
-        if (change) cleanSinksSources();
     }
 
     public Set<Integer> cleanChains() {
+        Set<Integer> selfCycles = new HashSet<>();
         int chainNode = findChain();
-        Set<Integer> nodeToDelete = cleanSelfCircles();
-        nodeToDelete.addAll(cleanSelfCircles());
         while (chainNode != -1) {
-            if(nodeMap.get(chainNode).getPostNodes().contains(chainNode)) System.out.println("GEFAHR");
             DirectedNode node = nodeMap.get(chainNode);
-            if (node.getIn_degree() == 1 && node.getOut_degree() >= 1) {
-                int preNode = node.getPreNodes().iterator().next();
-                for (Integer postNode : node.getPostNodes()) {
+            if (node.getInDegree() == 1 && node.getOutDegree() >= 1) {
+                int preNode = node.getInNodes().iterator().next();
+                for (Integer postNode : node.getOutNodes()) {
                     addEdge(preNode, postNode);
                 }
+
+                // If a selfCycle is created we will remove it immediately
+                if (nodeMap.get(preNode).isSelfCycle()) {
+                    removeNode(preNode);
+                    selfCycles.add(preNode);
+                }
             }
+
             // If in_degree > 1 and out_degree == 1
             else {
-                int postNode = node.getPostNodes().iterator().next();
-                for (Integer preNode : node.getPreNodes()) {
+                int postNode = node.getOutNodes().iterator().next();
+                for (Integer preNode : node.getInNodes()) {
                     addEdge(preNode, postNode);
                 }
+
+                // If a selfCycle is created we will remove it immediately
+                if (nodeMap.get(postNode).isSelfCycle()) {
+                    removeNode(postNode);
+                    selfCycles.add(postNode);
+                }
             }
+
+            // Remove the chainNode and search for a new one
             removeNode(chainNode);
-            nodeToDelete.addAll(cleanSelfCircles());
             chainNode = findChain();
         }
-        return nodeToDelete;
+        return selfCycles;
     }
 
     public int findChain() {
         for (DirectedNode node : nodeMap.values()) {
-            if (node.getIn_degree() == 1 && node.getOut_degree() >= 1) {
-                if (!node.getPreNodes().iterator().next().equals(node.getNodeID())) {
+            if (node.getInDegree() == 1 && node.getOutDegree() >= 1) {
+                if (!node.getInNodes().iterator().next().equals(node.getNodeID())) {
                     return node.getNodeID();
                 }
             }
-            if (node.getOut_degree() == 1 && node.getIn_degree() >= 1) {
-                if (!node.getPostNodes().iterator().next().equals(node.getNodeID())) {
+            if (node.getOutDegree() == 1 && node.getInDegree() >= 1) {
+                if (!node.getOutNodes().iterator().next().equals(node.getNodeID())) {
                     return node.getNodeID();
                 }
 
             }
         }
         return -1;
-    }
-
-    public Set<Integer> cleanSelfCircles() {
-        Set<Integer> nodeToDelete = new HashSet<>();
-        for (DirectedNode node : nodeMap.values()) {
-            if (node.getPreNodes().contains(node.getNodeID()) || node.getPostNodes().contains(node.getNodeID())) {
-                nodeToDelete.add(node.getNodeID());
-            }
-        }
-        for (Integer nodeId : nodeToDelete) {
-            removeNode(nodeId);
-        }
-        return nodeToDelete;
     }
 
     public boolean addNode(Integer nid) {
@@ -193,14 +164,44 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         if (!nodeMap.containsKey(nodeID)) return false;
         DirectedNode node = nodeMap.get(nodeID);
 
-        for (Integer preNode : node.getPreNodes()) {
+        for (Integer preNode : node.getInNodes()) {
             nodeMap.get(preNode).removePostNode(nodeID);
         }
-        for (Integer postNode : node.getPostNodes()) {
+        for (Integer postNode : node.getOutNodes()) {
             nodeMap.get(postNode).removePreNode(nodeID);
         }
         nodeMap.remove(nodeID);
         return true;
+    }
+
+    public void removeSinkSource(Integer nodeID) {
+        if (!nodeMap.containsKey(nodeID)) return;
+        DirectedNode node = nodeMap.get(nodeID);
+
+        if (node.getInDegree() > 0) {
+            HashSet<Integer> inNodes = new HashSet<>(node.getInNodes());
+            removeNode(nodeID);
+            for (Integer inNodeId : inNodes) {
+                DirectedNode inNode = nodeMap.get(inNodeId);
+                if (inNode == null) continue;
+                inNode.removePostNode(nodeID);
+                if (inNode.isSinkSource()) {
+                    removeSinkSource(inNodeId);
+                }
+            }
+        }
+        else {
+            HashSet<Integer> outNodes = new HashSet<>(node.getOutNodes());
+            removeNode(nodeID);
+            for (Integer outNodeId : outNodes) {
+                DirectedNode outNode = nodeMap.get(outNodeId);
+                if (outNode == null) continue;
+                outNode.removePreNode(nodeID);
+                if (outNode.isSinkSource()) {
+                    removeSinkSource(outNodeId);
+                }
+            }
+        }
     }
 
     @Override
@@ -214,89 +215,55 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return graphString.toString();
     }
 
-    //Set to just one cycle!
-    public Set<Deque<Integer>> findCycles() {
-        Set<Deque<Integer>> cycles = new HashSet<>();
-        Map<Integer, Boolean> visited = new HashMap<>();
-
-        for (Integer i : nodeMap.keySet()) {
-            visited.put(i, false);
-        }
-
-        for (Integer start : nodeMap.keySet()) {
-            if (visited.get(start)) continue;
-            Deque<Integer> deque = new ArrayDeque<>();
-            deque.push(start);
-            while (!deque.isEmpty()) {
-                int current = deque.peek();
-                if (visited.get(current) != null && !visited.get(current)) {
-                    visited.put(current, true);
-                    DirectedNode currentNode = nodeMap.get(current);
-                    if (currentNode.getOut_degree() == 0) deque.pop();
-                    for (int dest : currentNode.getPostNodes()) {
-                        deque.push(dest);
-                        if (visited.get(dest) != null && visited.get(dest)) {
-                            while (deque.peekLast() != dest) deque.pollLast();
-                            deque.pop();
-                            cycles.add(copyDeque(deque));
-                            if (cycles.size() > 5) return cycles;
-                        }
-                    }
-                } else {
-                    deque.pop();
-                }
-            }
-        }
-        return cycles;
-    }
-
-    private Deque<Integer> copyDeque(Deque<Integer> deque) {
-        return new ArrayDeque<>(deque);
-    }
-
-    public Deque<Integer> findBusyCycle() {
-        Set<Deque<Integer>> cycles = findCycles();
-        if (cycles == null) return null;
-        int crossingID = findCrossing(cycles);
-        Deque<Integer> smallCycle = null;
-        for (Deque<Integer> cycle : cycles) {
-            if (cycle.contains(crossingID) && smallCycle == null
-                    || cycle.contains(crossingID) && cycle.size() < smallCycle.size()) {
-                smallCycle = cycle;
-            }
-        }
-        return smallCycle;
-    }
-
-    public Deque<Integer> findCycle() {
+    public Deque<Integer> findBestCycle() {
         HashMap<Integer, Boolean> visited = new HashMap<>();
+        HashMap<Integer, Integer> parent = new HashMap<>();
+        Deque<Integer> cycle = new ArrayDeque<>();
         for (Integer i : nodeMap.keySet()) {
             visited.put(i, false);
+            parent.put(i, -1);
         }
         for (Integer start : nodeMap.keySet()) {
             if (visited.get(start)) continue;
-            Deque<Integer> deque = new ArrayDeque<>();
-            deque.push(start);
-            while (!deque.isEmpty()) {
-                int current = deque.peek();
-                if (visited.get(current) != null && !visited.get(current)) {
-                    visited.put(current, true);
-                    DirectedNode currentNode = nodeMap.get(current);
-                    if (currentNode.getOut_degree() == 0) deque.pop();
-                    for (int dest : currentNode.getPostNodes()) {
-                        deque.push(dest);
-                        if (visited.get(dest) != null && visited.get(dest)) {
-                            while (deque.peekLast() != dest) deque.pollLast();
-                            deque.pop();
-                            return deque;
+            Deque<Integer> queue = new ArrayDeque<>();
+            Deque<Integer> tempCycle = new ArrayDeque<>();
+            queue.add(start);
+            visited.put(start, true);
+            while(!queue.isEmpty()) {
+                Integer u = queue.pop();
+                for (Integer v : nodeMap.get(u).getOutNodes()) {
+                    if (!visited.get(v)) {
+                        parent.put(v, u);
+                        visited.put(v, true);
+                        queue.add(v);
+                    }
+                    if (v.equals(start)) {
+
+                        int w = u;
+                        while(w != -1) {
+                            tempCycle.add(w);
+                            w = parent.get(w);
                         }
                     }
-                } else {
-                    deque.pop();
+                    if (!tempCycle.isEmpty()) break;
+                }
+                if (!tempCycle.isEmpty()) break;
+            }
+            Deque<Integer> nodesLeft = new ArrayDeque();
+            if (!cycle.isEmpty()) {
+                for (Integer u : tempCycle) {
+                    if (!nodeMap.get(u).isFixed()) nodesLeft.add(u);
                 }
             }
+            else {
+                nodesLeft = tempCycle;
+            }
+            if (cycle.isEmpty() || (cycle.size() > nodesLeft.size() && nodesLeft.size() > 1)) {
+                cycle = nodesLeft;
+            }
         }
-        return null;
+        if(cycle.isEmpty()) return null;
+        return cycle;
     }
 
     public boolean containsNode(Integer u) {
@@ -311,57 +278,23 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return nodeMap.size();
     }
 
-    public Set<Set<Integer>> findDoubleLinks() {
-        Set<Set<Integer>> out = new HashSet();
-        for (Integer node : nodeMap.keySet()) {
-            if (!getNode(node).getPostNodes().contains(node)) {
-                for (Integer succ : getNode(node).getPostNodes()) {
-                    if (getNode(succ).getPostNodes().contains(node)) {
-                        Set<Integer> tmp = new HashSet();
-                        tmp.add(node);
-                        tmp.add(succ);
-                        out.add(tmp);
-                    }
-                }
-            }
-        }
-        return out;
-    }
-
-    public Set<Set<Integer>> findTripleLinks(Set<Set<Integer>> doubles) {
-        Set<Set<Integer>> out = new HashSet();
-        for (Set<Integer> pair : doubles) {
-            Set<Integer> temp = findAllOutNodes(pair);
-            temp.retainAll(findAllInNodes(pair));
-            for (Integer node : temp) {
-                Set<Integer> temp2 = new HashSet(pair);
-                temp2.add(node);
-                out.add(temp2);
-            }
-        }
-        return out;
-    }
-
-    public Set<Integer> findAllOutNodes(Set<Integer> nodes) {
-        Set<Integer> out = new HashSet();
-        for (Integer node : nodes) {
-            out.addAll(getNode(node).getPostNodes());
-        }
-        out.removeAll(nodes);
-        return out;
-    }
-
-    public Set<Integer> findAllInNodes(Set<Integer> nodes) {
-        Set<Integer> out = new HashSet();
-        for (Integer node : nodes) {
-            out.addAll(getNode(node).getPreNodes());
-        }
-        out.removeAll(nodes);
-        return out;
-    }
-
     @Override
     public int compareTo(DirectedGraph o) {
         return Integer.compare(this.size(), o.size());
     }
+
+    /* OLD METHODS
+    public void cleanSinksSources() {
+        boolean change = false;
+        Set<Integer> nodes = new HashSet<>(nodeMap.keySet());
+        for (Integer nid : nodes) {
+            DirectedNode node = nodeMap.get(nid);
+            if (node.getInDegree() == 0 || node.getOutDegree() == 0) {
+                removeNode(nid);
+                change = true;
+            }
+        }
+        if (change) cleanSinksSources();
+    }
+     */
 }

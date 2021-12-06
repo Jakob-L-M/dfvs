@@ -3,59 +3,37 @@ import java.util.Set;
 
 public class DirectedNode {
     private final Integer nodeID;
-    private Set<Integer> preNodes = new HashSet<>();
-    private Set<Integer> postNodes = new HashSet<>();
+    private final Set<Integer> inNodes = new HashSet<>();
+    private final Set<Integer> outNodes = new HashSet<>();
 
     private boolean fixed;
-    private int in_degree;
-    private int out_degree;
 
     DirectedNode(Integer nodeID) {
         this.nodeID = nodeID;
         this.fixed = false;
-        this.in_degree = 0;
-        this.out_degree = 0;
     }
 
     public DirectedNode(DirectedNode that) {
         this.nodeID = that.getNodeID();
         this.fixed = false;
-        this.in_degree = 0;
-        this.out_degree = 0;
-        this.preNodes.addAll(that.getPreNodes());
-        this.postNodes.addAll(that.getPostNodes());
+        this.inNodes.addAll(that.getInNodes());
+        this.outNodes.addAll(that.getOutNodes());
     }
 
     public boolean addPreNode(Integer pre) {
-        if(preNodes.add(pre)) {
-            in_degree++;
-            return true;
-        }
-        return false;
+        return inNodes.add(pre);
     }
 
     public boolean addPostNode(Integer post) {
-        if(postNodes.add(post)) {
-            out_degree++;
-            return true;
-        }
-        return false;
+        return outNodes.add(post);
     }
 
     public boolean removePreNode(Integer pre) {
-        if(preNodes.remove(pre)) {
-            in_degree--;
-            return true;
-        }
-        return false;
+        return inNodes.remove(pre);
     }
 
     public boolean removePostNode(Integer post) {
-        if(postNodes.remove(post)) {
-            out_degree--;
-            return true;
-        }
-        return false;
+        return outNodes.remove(post);
     }
 
     public void fixNode() {
@@ -70,37 +48,32 @@ public class DirectedNode {
         return this.nodeID;
     }
 
-    //temporarily using different methods
-    /*
-    public int getIn_degree() {
-        return in_degree;
+    public boolean isSinkSource() {return outNodes.size() == 0 || inNodes.size() == 0;}
+
+    public boolean isSelfCycle() {return outNodes.contains(nodeID) || inNodes.contains(nodeID);}
+
+    public int getInDegree() {
+        return inNodes.size();
     }
 
-    public int getOut_degree() {
-        return out_degree;
-    }*/
-    public int getIn_degree() {
-        return preNodes.size();
+    public int getOutDegree() {
+        return outNodes.size();
     }
 
-    public int getOut_degree() {
-        return postNodes.size();
+    public Set<Integer> getOutNodes() {
+        return outNodes;
     }
 
-    public Set<Integer> getPostNodes() {
-        return postNodes;
-    }
-
-    public Set<Integer> getPreNodes() {
-        return preNodes;
+    public Set<Integer> getInNodes() {
+        return inNodes;
     }
     @Override
     public DirectedNode clone() {
         DirectedNode nodeCopy = new DirectedNode(this.nodeID);
-        for(int postNode : this.postNodes) {
+        for(int postNode : this.outNodes) {
             nodeCopy.addPostNode(postNode);
         }
-        for(int preNode : this.preNodes) {
+        for(int preNode : this.inNodes) {
             nodeCopy.addPreNode(preNode);
         }
         return nodeCopy;
@@ -108,7 +81,7 @@ public class DirectedNode {
 
     @Override
     public String toString() {
-        return "Node: " + nodeID + " - in: {" + preNodes.toString() + "}, out: {" + postNodes.toString() +"}";
+        return "Node: " + nodeID + " - in: {" + inNodes.toString() + "}, out: {" + outNodes.toString() +"}";
     }
 }
 
