@@ -51,6 +51,9 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         }
     }
 
+    public DirectedGraph(BiMap<String, Integer> dict) {
+        this.dict = dict;
+    }
     public DirectedGraph() {
 
     }
@@ -208,6 +211,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     public String toString() {
         StringBuilder graphString = new StringBuilder();
 
+        Map<Integer, String> inverseMap = dict.inverse();
         for (DirectedNode node : nodeMap.values()) {
             graphString.append(node.toString()).append("\n");
         }
@@ -276,6 +280,18 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
     public int size() {
         return nodeMap.size();
+    }
+
+    public String hash() {
+        StringBuilder hash = new StringBuilder();
+        for (Integer nodeId: nodeMap.keySet()) {
+            hash.append(nodeId).append(';');
+            for (Integer outNode: nodeMap.get(nodeId).getOutNodes()){
+                hash.append(outNode).append(',');
+            }
+            hash.append(':');
+        }
+        return hash.toString();
     }
 
     @Override
