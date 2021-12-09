@@ -3,7 +3,6 @@ import java.util.*;
 public class Main {
 
     public static int recursions;
-    public static Set<Integer> fixGlobally = new HashSet<>();
     public static Map<String, Set<Integer>> graphHash = new HashMap<>();
 
     public static Set<Integer> dfvsBranch(DirectedGraph graph, int k, boolean isScc) {
@@ -127,6 +126,9 @@ public class Main {
 
                 return dfvs;
             }
+            else {
+                graph.getNode(v).fixNode();
+            }
         }
         return null;
     }
@@ -141,11 +143,6 @@ public class Main {
             if (k + selfCycle.size() > max_k) {
                 return null;
             }
-            for(Integer node : fixGlobally) {
-                graph.nodeMap.get(node).fixNode();
-            }
-            fixGlobally = new HashSet<>();
-
             dfvs = dfvsBranch(graph, k, isScc);
             k++;
         }
@@ -154,15 +151,19 @@ public class Main {
     }
 
     public static void main(String[] args) {
-        DirectedGraph graph = new DirectedGraph(
-                args[0]);
+        //DirectedGraph graph = new DirectedGraph(args[0]);
+        DirectedGraph graph = new DirectedGraph("instances/complex/biology-n_45-m_326-p_0.5-16");
+        //
+        long time = -System.nanoTime();
         Set<Integer> solution = dfvsSolve(graph, Integer.MAX_VALUE, false);
+        time += System.nanoTime();
         if (solution != null) {
             for (int i : solution) {
                 System.out.println(i);
             }
-            //System.out.println(solution.size());
+            System.out.println(solution.size());
         }
+        System.out.println("time: " + time/1000000000L);
         System.out.println("#recursive steps: " + recursions);
     }
 }

@@ -262,6 +262,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             else {
                 nodesLeft = tempCycle;
             }
+            if(tempCycle.size() == 2) return tempCycle;
             if (cycle.isEmpty() || (cycle.size() > nodesLeft.size() && nodesLeft.size() > 1)) {
                 cycle = nodesLeft;
             }
@@ -273,6 +274,8 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     public boolean containsNode(Integer u) {
         return nodeMap.containsKey(u);
     }
+
+    public boolean hasEdge(Integer u, Integer v) { return  nodeMap.get(u).getOutNodes().contains(v); }
 
     public DirectedNode getNode(Integer u) {
         return nodeMap.get(u);
