@@ -7,7 +7,9 @@ public class Main {
 
     public static Set<Integer> dfvsBranch(DirectedGraph graph, int k, boolean isScc) {
 
-        if (k < 0) return null;
+        Stackings stacking = new Stackings(graph);
+        int lowerBound = stacking.findCirclePacking().size();
+        if (k < lowerBound) return null;
 
         // clean the graph and save all selfCycle-Nodes that have been removed during cleaning
         Set<Integer> selfCycles = graph.cleanGraph();//new HashSet<>();
@@ -135,8 +137,9 @@ public class Main {
 
     public static Set<Integer> dfvsSolve(DirectedGraph graph, int max_k, boolean isScc) {
         Set<Integer> selfCycle = graph.cleanGraph();
-
-        int k = 0;
+        Stackings stacking = new Stackings(graph);
+        int lowerBound = stacking.findCirclePacking().size();
+        int k = lowerBound;
         Set<Integer> dfvs = null;
 
         while (dfvs == null) {
@@ -163,7 +166,7 @@ public class Main {
             }
             System.out.println(solution.size());
         }
-        System.out.println("time: " + time/1000000000L);
+        //System.out.println("time: " + time/1000000000L);
         System.out.println("#recursive steps: " + recursions);
     }
 }

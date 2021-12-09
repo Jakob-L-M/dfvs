@@ -297,6 +297,29 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return hash.toString();
     }
 
+    public DirectedGraph inducedSubGraph(Set<Integer> nodes) {
+        BiMap<String, Integer> inverseDict = dict;
+        DirectedGraph subGraph = new DirectedGraph(inverseDict);
+        for (Integer n : nodes) {
+            subGraph.addNode(n);
+        }
+        for (Integer u : nodes) {
+            DirectedNode uNode = getNode(u);
+            for (Integer v : uNode.getInNodes()) {
+                if (subGraph.containsNode(v)) {
+                    subGraph.addEdge(v, u);
+                }
+            }
+            for (Integer v : uNode.getOutNodes()) {
+                if (subGraph.containsNode(v)) {
+                    subGraph.addEdge(u, v);
+                }
+            }
+        }
+        return subGraph;
+    }
+
+
     @Override
     public int compareTo(DirectedGraph o) {
         return Integer.compare(this.size(), o.size());
