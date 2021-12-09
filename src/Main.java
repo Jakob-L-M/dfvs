@@ -11,7 +11,7 @@ public class Main {
         if (k < 0) return null;
 
         // clean the graph and save all selfCycle-Nodes that have been removed during cleaning
-        Set<Integer> selfCycles = graph.cleanGraph();//new HashSet<>();
+        Set<Integer> selfCycles = graph.cleanGraph(k);//new HashSet<>();
 
         // If there should be more selfCycles than k, we can break here.
         if (selfCycles.size() > k) {
@@ -24,7 +24,7 @@ public class Main {
 
         if(!isScc) {
             //init tarjan
-            newTarjan tarjan = new newTarjan(graph);
+            Tarjan tarjan = new Tarjan(graph);
 
             // calculate SCCs and create an iterator to access them
             Set<DirectedGraph> subGraphs = tarjan.getSCCGraphs();
@@ -132,7 +132,8 @@ public class Main {
     }
 
     public static Set<Integer> dfvsSolve(DirectedGraph graph, int max_k, boolean isScc) {
-        Set<Integer> selfCycle = graph.cleanGraph();
+        graph.calculateAllPedalValues();
+        Set<Integer> selfCycle = graph.cleanGraph(Integer.MAX_VALUE);
 
         int k = 0;
         Set<Integer> dfvs = null;
@@ -153,7 +154,22 @@ public class Main {
         return dfvs;
     }
 
+    public static void developMain() {
+        String file = "instances/complex/biology-n_45-m_326-p_0.75-16";
+        DirectedGraph graph = new DirectedGraph(file);
+        System.out.println("Solving: " + file);
+        long time = -System.nanoTime();
+        Set<Integer> solution = dfvsSolve(graph, Integer.MAX_VALUE, false);
+        if (solution != null) {
+            System.out.println("k: " + solution.size());
+        }
+        System.out.println("#recursive steps: " + recursions);
+        double sec = utils.round((time + System.nanoTime())/1_000_000_000.0, 4);
+        System.out.println("time: " + sec);
+    }
+
     public static void main(String[] args) {
+        //developMain();
         DirectedGraph graph = new DirectedGraph(
                 args[0]);
         Set<Integer> solution = dfvsSolve(graph, Integer.MAX_VALUE, false);
@@ -161,8 +177,8 @@ public class Main {
             for (int i : solution) {
                 System.out.println(i);
             }
-            //System.out.println(solution.size());
         }
         System.out.println("#recursive steps: " + recursions);
+
     }
 }

@@ -5,7 +5,7 @@ public class DirectedNode {
     private final Integer nodeID;
     private final Set<Integer> inNodes = new HashSet<>();
     private final Set<Integer> outNodes = new HashSet<>();
-
+    private int pedal = 0;
     private boolean fixed;
 
     DirectedNode(Integer nodeID) {
@@ -52,6 +52,8 @@ public class DirectedNode {
 
     public boolean isSelfCycle() {return outNodes.contains(nodeID) || inNodes.contains(nodeID);}
 
+    public boolean isTwoCycleWith(int otherNode) {return outNodes.contains(otherNode) && inNodes.contains(otherNode);}
+
     public int getInDegree() {
         return inNodes.size();
     }
@@ -67,6 +69,19 @@ public class DirectedNode {
     public Set<Integer> getInNodes() {
         return inNodes;
     }
+
+    public int getPedal() {
+        return pedal;
+    }
+
+    public void setPedal(int pedal) {
+        this.pedal = pedal;
+    }
+
+    public void setFixed(boolean fixed) {
+        this.fixed = fixed;
+    }
+
     @Override
     public DirectedNode clone() {
         DirectedNode nodeCopy = new DirectedNode(this.nodeID);
