@@ -1,3 +1,13 @@
+advotogo-n_1000     112
+advotogo-n_100     3
+advotogo-n_200     5
+advotogo-n_300     15
+advotogo-n_400     22
+advotogo-n_500     36
+advotogo-n_700     64
+advotogo-n_800     79
+baydry     7
+baywet     7
 biology-n_12-m_33-p_0.5-15     3
 biology-n_12-m_33-p_0.75-15     3
 biology-n_12-m_33-p_0.9-15     3
