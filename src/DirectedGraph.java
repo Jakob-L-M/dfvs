@@ -340,6 +340,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             else {
                 nodesLeft = tempCycle;
             }
+            if(tempCycle.size() == 2) return tempCycle;
             if (cycle.isEmpty() || (cycle.size() > nodesLeft.size() && nodesLeft.size() > 1)) {
                 cycle = nodesLeft;
             }
@@ -351,6 +352,8 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     public boolean containsNode(Integer u) {
         return nodeMap.containsKey(u);
     }
+
+    public boolean hasEdge(Integer u, Integer v) { return  nodeMap.get(u).getOutNodes().contains(v); }
 
     public DirectedNode getNode(Integer u) {
         return nodeMap.get(u);
@@ -371,6 +374,29 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         }
         return hash.toString();
     }
+
+    public DirectedGraph inducedSubGraph(Set<Integer> nodes) {
+        BiMap<String, Integer> inverseDict = dict;
+        DirectedGraph subGraph = new DirectedGraph(inverseDict);
+        for (Integer n : nodes) {
+            subGraph.addNode(n);
+        }
+        for (Integer u : nodes) {
+            DirectedNode uNode = getNode(u);
+            for (Integer v : uNode.getInNodes()) {
+                if (subGraph.containsNode(v)) {
+                    subGraph.addEdge(v, u);
+                }
+            }
+            for (Integer v : uNode.getOutNodes()) {
+                if (subGraph.containsNode(v)) {
+                    subGraph.addEdge(u, v);
+                }
+            }
+        }
+        return subGraph;
+    }
+
 
     @Override
     public int compareTo(DirectedGraph o) {
