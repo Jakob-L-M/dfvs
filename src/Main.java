@@ -137,7 +137,8 @@ public class Main {
     }
 
     public static Set<Integer> dfvsSolve(DirectedGraph graph, int max_k, boolean isScc) {
-        Set<Integer> selfCycle = graph.cleanGraph();
+        graph.calculateAllPedalValues();
+        Set<Integer> selfCycle = graph.cleanGraph(Integer.MAX_VALUE);
         Packing stacking = new Packing(graph);
         stacking.findCirclePacking();
         int k = stacking.getLowerBound();
@@ -147,11 +148,6 @@ public class Main {
             if (k + selfCycle.size() > max_k) {
                 return null;
             }
-            for(Integer node : fixGlobally) {
-                graph.nodeMap.get(node).fixNode();
-            }
-            fixGlobally = new HashSet<>();
-
             dfvs = dfvsBranch(graph, k, isScc);
             k++;
         }
