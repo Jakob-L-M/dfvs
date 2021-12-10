@@ -3,12 +3,14 @@ import java.util.*;
 public class Main {
 
     public static int recursions;
-    public static Set<Integer> fixGlobally = new HashSet<>();
     public static Map<String, Set<Integer>> graphHash = new HashMap<>();
 
     public static Set<Integer> dfvsBranch(DirectedGraph graph, int k, boolean isScc) {
 
-        if (k < 0) return null;
+        Packing stacking = new Packing(graph);
+        stacking.findCirclePacking();
+        int lowerBound = stacking.getLowerBound();
+        if (k < lowerBound) return null;
 
         // clean the graph and save all selfCycle-Nodes that have been removed during cleaning
         Set<Integer> selfCycles = graph.cleanGraph(k);//new HashSet<>();
@@ -24,7 +26,7 @@ public class Main {
 
         if(!isScc) {
             //init tarjan
-            Tarjan tarjan = new Tarjan(graph);
+            newTarjan tarjan = new newTarjan(graph);
 
             // calculate SCCs and create an iterator to access them
             Set<DirectedGraph> subGraphs = tarjan.getSCCGraphs();
@@ -127,15 +129,18 @@ public class Main {
 
                 return dfvs;
             }
+            else {
+                graph.getNode(v).fixNode();
+            }
         }
         return null;
     }
 
     public static Set<Integer> dfvsSolve(DirectedGraph graph, int max_k, boolean isScc) {
-        graph.calculateAllPedalValues();
-        Set<Integer> selfCycle = graph.cleanGraph(Integer.MAX_VALUE);
-
-        int k = 0;
+        Set<Integer> selfCycle = graph.cleanGraph();
+        Packing stacking = new Packing(graph);
+        stacking.findCirclePacking();
+        int k = stacking.getLowerBound();
         Set<Integer> dfvs = null;
 
         while (dfvs == null) {
@@ -177,8 +182,8 @@ public class Main {
             for (int i : solution) {
                 System.out.println(i);
             }
+            //System.out.println(solution.size());
         }
         System.out.println("#recursive steps: " + recursions);
-
     }
 }

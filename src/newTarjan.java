@@ -74,26 +74,10 @@ public class newTarjan {
 
     public Set<DirectedGraph> getSCCGraphs() {
         Set<DirectedGraph> sccGraphSet = new HashSet<>();
-        BiMap<String, Integer> inverseDict = this.graph.dict;
+        BiMap<String, Integer> inverseDict = graph.dict;//
         Map<Integer, ArrayList<Integer>> scc = getSCCs();
         for (int i : scc.keySet()) {
-            DirectedGraph addGraph = new DirectedGraph(inverseDict);
-            for (Integer n : scc.get(i)) {
-                addGraph.addNode(n);
-            }
-            for (Integer u : scc.get(i)) {
-                DirectedNode uNode = graph.getNode(u);
-                for (Integer v : uNode.getInNodes()) {
-                    if (addGraph.containsNode(v)) {
-                        addGraph.addEdge(v, u);
-                    }
-                }
-                for (Integer v : uNode.getOutNodes()) {
-                    if (addGraph.containsNode(v)) {
-                        addGraph.addEdge(u, v);
-                    }
-                }
-            }
+            DirectedGraph addGraph = graph.inducedSubGraph(new HashSet(scc.get(i)));
             sccGraphSet.add(addGraph);
         }
         return sccGraphSet;
