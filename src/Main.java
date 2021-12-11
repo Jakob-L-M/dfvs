@@ -26,7 +26,7 @@ public class Main {
 
         if(!isScc) {
             //init tarjan
-            newTarjan tarjan = new newTarjan(graph);
+            Tarjan tarjan = new Tarjan(graph);
 
             // calculate SCCs and create an iterator to access them
             Set<DirectedGraph> subGraphs = tarjan.getSCCGraphs();
