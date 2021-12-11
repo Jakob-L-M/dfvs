@@ -5,12 +5,13 @@ public class DirectedNode {
     private final Integer nodeID;
     private final Set<Integer> inNodes = new HashSet<>();
     private final Set<Integer> outNodes = new HashSet<>();
-    private int pedal = 0;
+    private int pedal;
     private boolean fixed;
 
     DirectedNode(Integer nodeID) {
         this.nodeID = nodeID;
         this.fixed = false;
+        this.pedal = 0;
     }
 
     public DirectedNode(DirectedNode that) {
