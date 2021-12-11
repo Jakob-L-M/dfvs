@@ -3,7 +3,6 @@ import java.util.*;
 public class Main {
 
     public static int recursions;
-    public static Map<String, Set<Integer>> graphHash = new HashMap<>();
 
     public static Set<Integer> dfvsBranch(DirectedGraph graph, int k, boolean isScc) {
 
@@ -13,7 +12,12 @@ public class Main {
         if (k < lowerBound) return null;
 
         // clean the graph and save all selfCycle-Nodes that have been removed during cleaning
-        Set<Integer> selfCycles = graph.cleanGraph(k);//new HashSet<>();
+        Set<Integer> selfCycles;
+        if (!isScc) {
+            selfCycles = graph.cleanGraph(k);//new HashSet<>();
+        } else {
+            selfCycles = new HashSet<>();
+        }
 
         // If there should be more selfCycles than k, we can break here.
         if (selfCycles.size() > k) {
@@ -23,75 +27,6 @@ public class Main {
         // Reduce the leftover budget by selfCycles.size()
         k = k - selfCycles.size();
 
-
-        if(!isScc) {
-            //init tarjan
-            Tarjan tarjan = new Tarjan(graph);
-
-            // calculate SCCs and create an iterator to access them
-            Set<DirectedGraph> subGraphs = tarjan.getSCCGraphs();
-            Iterator<DirectedGraph> it = subGraphs.iterator();
-
-            // If there is only one sub-graph we can skip solving sub-graphs
-            if (subGraphs.size() > 1) {
-
-                // HashSet to store the solutions of sub-graphs
-                Set<Integer> dfvs_mult = new HashSet<>();
-
-                while (it.hasNext() && dfvs_mult.size() <= k) {
-
-                    // Store the next Strongly Connected Component and create its hash
-                    DirectedGraph scc = it.next();
-                    String hash = scc.hash();
-
-                    if (graphHash.containsKey(hash)) {
-
-                        // We already solved the sub-graph at some point
-                        Set<Integer> knownSolution = graphHash.get(hash);
-
-                        // Check if adding the solution still satisfies k.
-                        if (k - dfvs_mult.size() >= knownSolution.size()) {
-
-                            // Add the solution and move to the next sub-graph
-                            dfvs_mult.addAll(knownSolution);
-                            continue;
-
-                        } else {
-
-                            // We know that there is not enough capacity left to solve any other grapf
-                            // break branching
-                            return null;
-                        }
-                    }
-
-                    // solve the sub-graph with a reduced upper limit
-                    Set<Integer> solutionSCC = dfvsSolve(scc, k - dfvs_mult.size(), true);
-
-                    // Is there a valid solution
-                    if (solutionSCC == null) {
-                        return null;
-                    } else {
-
-                        // save the solution and add it the Set of Nodes
-                        graphHash.put(hash, solutionSCC);
-                        dfvs_mult.addAll(solutionSCC);
-                    }
-
-                }
-
-                // Check why the while-loop broke
-                if (dfvs_mult.size() <= k) {
-
-                    // while-loop broke due to iterator having no sub-graphs left
-                    // found a solution that satisfies k
-                    dfvs_mult.addAll(selfCycles);
-                    return dfvs_mult;
-                }
-                // No Solution found, sub-graphs can not be solved by Limit.
-                // We should never reach here
-                return null;
-            }
-        }
 
         // find a Cycle
         Deque<Integer> cycle = graph.findBestCycle();
@@ -104,82 +39,119 @@ public class Main {
 
         }
 
+        Map<Integer, List<Integer>> sortedCycle = new HashMap<>();
         for (Integer v : cycle) {
-
-            // create a copy -> we will branch off of that copy
-            DirectedGraph graphCopy = new DirectedGraph(graph);
-
-            // delete a vertex of the circle and branch for here
-            graphCopy.removeNode(v);
-
-            // increment recursions to keep track of tree size
-            recursions++;
-
-            // branch with a maximum cost of k
-            // -1: Just deleted a node
-            // -selfCycles.size(): nodes that where removed during graph reduction
-            Set<Integer> dfvs = dfvsBranch(graphCopy, k - 1, false);
-
-            // if there is a valid solution in the recursion it will be returned
-            if (dfvs != null) {
-
-                // Add the nodeId of the valid solution and all selfCycles
-                dfvs.add(v);
-                dfvs.addAll(selfCycles);
-
-                return dfvs;
+            graph.calculatePedalValue(v);
+            if (!sortedCycle.containsKey(graph.getNode(v).getPedal())) {
+                sortedCycle.put(graph.getNode(v).getPedal(), new ArrayList<>());
             }
-            else {
-                graph.getNode(v).fixNode();
+            sortedCycle.get(graph.getNode(v).getPedal()).add(v);
+        }
+        List<Integer> pedalValues = new ArrayList<>(sortedCycle.keySet());
+        pedalValues.sort(Collections.reverseOrder());
+
+        for (Integer i : pedalValues) {
+
+            for (Integer v : sortedCycle.get(i)) {
+                // create a copy -> we will branch off of that copy
+                DirectedGraph graphCopy = new DirectedGraph(graph);
+
+                // delete a vertex of the circle and branch for here
+                graphCopy.removeNode(v);
+
+                // increment recursions to keep track of tree size
+                recursions++;
+
+                // branch with a maximum cost of k
+                // -1: Just deleted a node
+                // -selfCycles.size(): nodes that where removed during graph reduction
+                Set<Integer> dfvs = dfvsBranch(graphCopy, k - 1, false);
+
+                // if there is a valid solution in the recursion it will be returned
+                if (dfvs != null) {
+
+                    // Add the nodeId of the valid solution and all selfCycles
+                    dfvs.add(v);
+                    dfvs.addAll(selfCycles);
+
+                    return dfvs;
+                } else {
+                    graph.getNode(v).fixNode();
+                }
             }
         }
         return null;
     }
 
-    public static Set<Integer> dfvsSolve(DirectedGraph graph, int max_k, boolean isScc) {
-        graph.calculateAllPedalValues();
-        Set<Integer> selfCycle = graph.cleanGraph(Integer.MAX_VALUE);
-        Packing stacking = new Packing(graph);
-        stacking.findCirclePacking();
-        int k = stacking.getLowerBound();
-        Set<Integer> dfvs = null;
+    public static Set<Integer> dfvsSolve(DirectedGraph graph) {
+        Set<Integer> allDfvs = graph.cleanGraph(Integer.MAX_VALUE);
+        Set<DirectedGraph> SCCs = new Tarjan(graph).getSCCGraphs();
 
-        while (dfvs == null) {
-            if (k + selfCycle.size() > max_k) {
-                return null;
+        for (DirectedGraph scc : SCCs) {
+            allDfvs.addAll(scc.cleanGraph(Integer.MAX_VALUE));
+            Packing stacking = new Packing(scc);
+            stacking.findCirclePacking();
+            int k = stacking.getLowerBound();
+            Set<Integer> dfvs = null;
+
+            while (dfvs == null) {
+                dfvs = dfvsBranch(scc, k, true);
+                k++;
             }
-            dfvs = dfvsBranch(graph, k, isScc);
-            k++;
+            allDfvs.addAll(dfvs);
         }
-        dfvs.addAll(selfCycle);
-        return dfvs;
+
+        return allDfvs;
     }
 
-    public static void developMain() {
-        String file = "instances/complex/biology-n_45-m_326-p_0.75-16";
+    public static void developMain(String file) {
         DirectedGraph graph = new DirectedGraph(file);
         System.out.println("Solving: " + file);
         long time = -System.nanoTime();
-        Set<Integer> solution = dfvsSolve(graph, Integer.MAX_VALUE, false);
-        if (solution != null) {
-            System.out.println("k: " + solution.size());
-        }
-        System.out.println("#recursive steps: " + recursions);
-        double sec = utils.round((time + System.nanoTime())/1_000_000_000.0, 4);
-        System.out.println("time: " + sec);
+        Set<Integer> solution = dfvsSolve(graph);
+        System.out.println("\tk: " + solution.size());
+        System.out.println("\t#recursive steps: " + recursions);
+        double sec = utils.round((time + System.nanoTime()) / 1_000_000_000.0, 4);
+        System.out.println("\ttime: " + sec);
+        recursions = 0;
     }
 
     public static void main(String[] args) {
-        //developMain();
+        /*
+        developMain("instances/complex/chess-n_1000 "); //60
+        developMain("instances/complex/biology-n_35-m_315-p_0.75-18");//15
+        developMain("instances/complex/link-kv-n_300"); //55
+        developMain("instances/complex/biology-n_30-m_287-p_0.5-5"); //15
+        developMain("instances/complex/biology-n_35-m_315-p_0.5-18"); //17
+
+         */
+        developMain("instances/synthetic/synth-n_50-m_357-k_20-p_0.2.txt");//20
+        /*
         DirectedGraph graph = new DirectedGraph(
                 args[0]);
-        Set<Integer> solution = dfvsSolve(graph, Integer.MAX_VALUE, false);
+        Set<Integer> solution = dfvsSolve(graph);
         if (solution != null) {
             for (int i : solution) {
                 System.out.println(i);
             }
-            //System.out.println(solution.size());
         }
         System.out.println("#recursive steps: " + recursions);
+         */
     }
 }
+/*
+Solving: instances/complex/chess-n_1000
+k: 60
+#recursive steps: 167710 - 24974
+time: 0:19.70 - 17.2822
+
+Solving: instances/complex/biology-n_35-m_315-p_0.5-18
+k: 17
+#recursive steps: 996892 - 27353
+time: 0:50.35 - 11.5849
+
+Solving: instances/complex/biology-n_35-m_315-p_0.75-18
+k: 15
+#recursive steps: 266033 - 23847
+time: 0:15.13 - 8.8515
+ */
