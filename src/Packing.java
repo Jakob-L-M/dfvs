@@ -1,15 +1,15 @@
 import java.util.*;
 
 public class Packing {
-    private DirectedGraph graph;
-    private DirectedGraph graphFixed;
-    private Set<Integer> usedNodes;
-    private Set<Deque> costlySubgraphs;
+    private final DirectedGraph graph;
+    private final DirectedGraph graphFixed;
+    private final Set<Integer> usedNodes;
+    private final Set<Deque<Integer>> costlySubGraphs;
 
     Packing(DirectedGraph graph) {
         this.graph = new DirectedGraph(graph);
         graphFixed = new DirectedGraph(graph);
-        costlySubgraphs = new HashSet<>();
+        costlySubGraphs = new HashSet<>();
         usedNodes = new HashSet<>();
     }
 
@@ -17,14 +17,14 @@ public class Packing {
         DirectedGraph graph = new DirectedGraph("instances/complex/biology-n_45-m_326-p_0.5-16");
         Packing stacking = new Packing(graph);
         stacking.findCirclePacking();
-        System.out.println(stacking.costlySubgraphs);
+        System.out.println(stacking.costlySubGraphs);
         System.out.println(stacking.usedNodes);
     }
 
     public void findCirclePacking() {
         Deque<Integer> cycle = graph.findBestCycle();
         while (cycle != null) {
-            costlySubgraphs.add(cycle);
+            costlySubGraphs.add(cycle);
             for (Integer i : cycle) {
                 graph.removeNode(i);
             }
@@ -34,7 +34,7 @@ public class Packing {
 
     public int getLowerBound() {
         int lowerBound = 0;
-        for (Deque deque : costlySubgraphs) {
+        for (Deque<Integer> deque : costlySubGraphs) {
             lowerBound++;
             if (deque.size() == 3) {
                 List<Integer> triplet = new ArrayList<>(deque);
