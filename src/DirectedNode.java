@@ -55,6 +55,23 @@ public class DirectedNode {
 
     public boolean isTwoCycleWith(int otherNode) {return outNodes.contains(otherNode) && inNodes.contains(otherNode);}
 
+    public int isTwoCycle() {
+        if (outNodes.size() < inNodes.size()) {
+            for (Integer outNode : outNodes) {
+                if (inNodes.contains(outNode)) {
+                    return outNode;
+                }
+            }
+        } else {
+            for (Integer inNode : inNodes) {
+                if(outNodes.contains(inNode)) {
+                    return inNode;
+                }
+            }
+        }
+        return -1;
+    }
+
     public int getInDegree() {
         return inNodes.size();
     }
