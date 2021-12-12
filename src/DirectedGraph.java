@@ -216,7 +216,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         for (Integer nid : nodes) {
             DirectedNode node = nodeMap.get(nid);
             if (node == null) continue;
-            if (node.getInDegree() == 2 && node.getOutDegree() == 2) {
+            if (node.getInDegree() >= 2 && node.getOutDegree() >= 2 && (node.getInDegree() == 2 || node.getOutDegree() == 2)) {
                 Iterator<Integer> outIterator = node.getOutNodes().iterator();
                 int outNode1 = outIterator.next();
                 int outNode2 = outIterator.next();
