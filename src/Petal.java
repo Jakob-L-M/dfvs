@@ -2,20 +2,33 @@ import java.util.*;
 
 public class Petal {
 
-    public static Tuple getPetalSet(Map<Integer, DirectedNode> nodeMap, int source, int sink) {
+    public static Tuple getPetalSet(DirectedGraph graph, int nodeId) {
+        graph.addNode(-1); //source
+        graph.addNode(-2); //sink
+
+        for (Integer outNode : graph.nodeMap.get(nodeId).getOutNodes()) {
+            graph.addEdge(-1, outNode);
+        }
+
+        for (Integer inNode : graph.nodeMap.get(nodeId).getInNodes()) {
+            graph.addEdge(inNode, -2);
+        }
+
+        graph.removeNode(nodeId);
+
         Map<Integer, Set<Integer>> rGraph = new HashMap<>();
         Map<Integer, Integer> parent = new HashMap<>();
         Set<Integer> petalSet = new HashSet<>();
 
-        for (Integer node : nodeMap.keySet()) {
-            rGraph.put(node, new HashSet<>(nodeMap.get(node).getOutNodes()));
+        for (Integer node : graph.nodeMap.keySet()) {
+            rGraph.put(node, new HashSet<>(graph.nodeMap.get(node).getOutNodes()));
         }
 
         int max_flow = 0;
 
-        while (bfs(rGraph, source, sink, parent)) {
-            int cur = parent.get(sink);
-            while (cur != source) {
+        while (bfs(rGraph, parent)) {
+            int cur = parent.get(-2);
+            while (cur != -1) {
                 rGraph.remove(cur);
                 petalSet.add(cur);
                 cur = parent.get(cur);
@@ -23,15 +36,31 @@ public class Petal {
             max_flow += 1;
             parent.clear();
         }
+
+        graph.addNode(nodeId);
+
+        for (Integer outNode : graph.nodeMap.get(-1).getOutNodes()) {
+            graph.addEdge(nodeId, outNode);
+        }
+
+        for (Integer inNode : graph.nodeMap.get(-2).getInNodes()) {
+            graph.addEdge(inNode, nodeId);
+        }
+
+        graph.removeNode(-1);
+        graph.removeNode(-2);
+
+        graph.nodeMap.get(nodeId).setPedal(max_flow);
+
         return new Tuple(max_flow, petalSet);
     }
 
-    private static boolean bfs(Map<Integer, Set<Integer>> rGraph, int source, int sink, Map<Integer, Integer> parent) {
+    private static boolean bfs(Map<Integer, Set<Integer>> rGraph, Map<Integer, Integer> parent) {
         Set<Integer> visited = new HashSet<>();
         Queue<Integer> queue = new LinkedList<>();
 
-        queue.add(source);
-        visited.add(source);
+        queue.add(-1);
+        visited.add(-1);
 
         // Standard BFS Loop
         while (!queue.isEmpty()) {
@@ -42,7 +71,7 @@ public class Petal {
                     if (!visited.contains(outNode)) {
                         parent.put(outNode, current);
                         // reached sink - break here
-                        if (outNode == sink) {
+                        if (outNode == -2) {
                             return true;
                         }
                         queue.add(outNode);
@@ -51,6 +80,6 @@ public class Petal {
                 }
             }
         }
-        return visited.contains(sink);
+        return visited.contains(-2);
     }
 }

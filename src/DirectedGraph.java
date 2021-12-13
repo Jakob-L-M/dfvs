@@ -152,34 +152,12 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     public void calculateAllPedalValues() {
         Set<Integer> nodes = new HashSet<>(nodeMap.keySet());
         for (Integer node : nodes) {
-            calculatePedalValue(node);
+            calculatePetal(node);
         }
     }
 
-    public void calculatePedalValue(int nodeId) {
-        addNode(-1); //source
-        addNode(-2); //sink
-        for (Integer outNode : nodeMap.get(nodeId).getOutNodes()) {
-            addEdge(-1, outNode);
-        }
-        for (Integer inNode : nodeMap.get(nodeId).getInNodes()) {
-            addEdge(inNode, -2);
-        }
-        removeNode(nodeId);
-
-        int pedal = Petal.getPetalSet(nodeMap, -1, -2).getValue();
-
-        addNode(nodeId);
-        for (Integer outNode : nodeMap.get(-1).getOutNodes()) {
-            addEdge(nodeId, outNode);
-        }
-        for (Integer inNode : nodeMap.get(-2).getInNodes()) {
-            addEdge(inNode, nodeId);
-        }
-        removeNode(-1);
-        removeNode(-2);
-
-        nodeMap.get(nodeId).setPedal(pedal);
+    public Tuple calculatePetal(int nodeId) {
+        return Petal.getPetalSet(this, nodeId);
     }
 
     public Set<Integer> cleanPedals(int k) {
@@ -191,7 +169,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
             if (nodeMap.get(nodeId).getPedal() == 0) {
                 // could have never been calculated
-                calculatePedalValue(nodeId);
+                calculatePetal(nodeId);
                 if (nodeMap.get(nodeId).getPedal() == 0) {
                     removeNode(nodeId);
                     continue;
@@ -200,7 +178,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             // possible flower
             if (nodeMap.get(nodeId).getPedal() > k - result.size()) {
                 // only recalculate if necessary
-                calculatePedalValue(nodeId);
+                calculatePetal(nodeId);
                 if (nodeMap.get(nodeId).getPedal() > k - result.size()) {
                     result.add(nodeId);
                     removeNode(nodeId);
