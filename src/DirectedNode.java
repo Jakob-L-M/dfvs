@@ -49,6 +49,8 @@ public class DirectedNode {
         return this.nodeID;
     }
 
+    public boolean isChain() {return (outNodes.size() >= 1 && inNodes.size() == 1) || (outNodes.size() == 1 && inNodes.size() >= 1);}
+
     public boolean isSinkSource() {return outNodes.size() == 0 || inNodes.size() == 0;}
 
     public boolean isSelfCycle() {return outNodes.contains(nodeID) || inNodes.contains(nodeID);}
