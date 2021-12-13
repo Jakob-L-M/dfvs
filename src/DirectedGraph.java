@@ -78,6 +78,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 continue;
             }
 
+            // clean chains
             if (node.isChain()) {
                 int temp = cleanChain(nodeId);
                 if (temp != -1) {
@@ -86,25 +87,35 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 continue;
             }
 
-            Set<Integer> triangle = cleanSpecialTriangle(nodeId);
+            // clean semi pendant triangle
+            Set<Integer> triangle = cleanSemiPendantTriangle(nodeId);
             if (triangle != null) {
                 deletedNodes.addAll(triangle);
                 continue;
             }
 
+            // clean a flower if the leftover budget is greater than 2
             if (k - deletedNodes.size() > 2) {
-                int temp = cleanPedals(nodeId, k - deletedNodes.size());
+                int temp = cleanPetal(nodeId, k - deletedNodes.size());
                 if (temp != -1) {
                     deletedNodes.add(temp);
                 }
             }
 
         }
+
+        // repeat until nothing is left to be cleaned
         if (!deletedNodes.isEmpty()) deletedNodes.addAll(cleanGraph(k - deletedNodes.size()));
 
         return deletedNodes;
     }
 
+    /**
+     * removes a chain and checks for selfCycles. If a selfCycle is generated if is remove immediately.
+     * @param nodeId id of a chain node. Method requires that the nodeId has been checked to be a chain.
+     *               Use .isChain()
+     * @return nodeId of a removed selfCycle, -1 if no selfCycle was generated.
+     */
     public int cleanChain(int nodeId) {
         int result = -1;
         DirectedNode node = nodeMap.get(nodeId);
@@ -139,14 +150,33 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return result;
     }
 
+    /**
+     * Calculates the max-flow value of a node and finds all petal nodes.
+     * @param nodeId id of the node that should be calculated
+     * @return Tuple. Tuple.value() gives the max-flow, Tuple.set() is a set of all nodes
+     * present in any flower leave or the flower center itself.
+     */
     public Tuple calculatePetal(int nodeId) {
         return Petal.getPetalSet(this, nodeId);
     }
 
-    public int cleanPedals(int nodeId, int k) {
+    /**
+     * checks if a flower is present and removes that flower. Also removes a node
+     * if that node is not in any circle. The petal value of a node will only be
+     * updated if a potential flower is found.
+     * @param nodeId id of the node that should be cleaned
+     * @param k maximum budget for cleaning
+     * @return nodeId if node has been clean or -1 if not
+     */
+    public int cleanPetal(int nodeId, int k) {
+        boolean recalculated = false;
+
         if (nodeMap.get(nodeId).getPedal() == 0) {
+
             // could have never been calculated
             calculatePetal(nodeId);
+            recalculated = true;
+
             if (nodeMap.get(nodeId).getPedal() == 0) {
                 removeNode(nodeId);
                 return -1;
@@ -154,17 +184,26 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         }
         // possible flower
         if (nodeMap.get(nodeId).getPedal() > k) {
+
             // only recalculate if necessary
-            calculatePetal(nodeId);
+            if(!recalculated) calculatePetal(nodeId);
+
             if (nodeMap.get(nodeId).getPedal() > k) {
                 removeNode(nodeId);
                 return nodeId;
             }
         }
+
+        // no flower
         return -1;
     }
 
-    public Set<Integer> cleanSpecialTriangle(int nodeId) {
+    /**
+     * cleans a semi pendant triangle at a given node
+     * @param nodeId id of the node that should be cleaned
+     * @return Set of cleaned nodeIds, null if no triangle was found
+     */
+    public Set<Integer> cleanSemiPendantTriangle(int nodeId) {
         DirectedNode node = nodeMap.get(nodeId);
         if (node.getInDegree() >= 2 && node.getOutDegree() >= 2 && (node.getInDegree() == 2 || node.getOutDegree() == 2)) {
             Iterator<Integer> outIterator = node.getOutNodes().iterator();
@@ -369,19 +408,4 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     public int compareTo(DirectedGraph o) {
         return Integer.compare(this.size(), o.size());
     }
-
-    /* OLD METHODS
-    public void cleanSinksSources() {
-        boolean change = false;
-        Set<Integer> nodes = new HashSet<>(nodeMap.keySet());
-        for (Integer nid : nodes) {
-            DirectedNode node = nodeMap.get(nid);
-            if (node.getInDegree() == 0 || node.getOutDegree() == 0) {
-                removeNode(nid);
-                change = true;
-            }
-        }
-        if (change) cleanSinksSources();
-    }
-     */
 }
