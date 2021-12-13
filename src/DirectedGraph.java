@@ -62,154 +62,127 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
     public Set<Integer> cleanGraph(int k) {
 
-        cleanSinksSources();
-        Set<Integer> newDeletedNodes = cleanChains();
-        newDeletedNodes.addAll(cleanSpecialTriangle());
-        if (k - newDeletedNodes.size() > 2) {
-            newDeletedNodes.addAll(cleanPedals(k - newDeletedNodes.size()));
-        }
-        Set<Integer> deletedNodes = new HashSet<>(newDeletedNodes);
-        while (!newDeletedNodes.isEmpty()) {
-            cleanSinksSources();
-            newDeletedNodes = cleanChains();
-            newDeletedNodes.addAll(cleanSpecialTriangle());
-            if (k - newDeletedNodes.size() - deletedNodes.size() > 2) {
-                newDeletedNodes.addAll(cleanPedals(k - newDeletedNodes.size() - deletedNodes.size()));
+        Set<Integer> nodes = new HashSet<>(nodeMap.keySet());
+        Set<Integer> deletedNodes = new HashSet<>();
+
+        for (Integer nodeId : nodes) {
+
+            // first we check if the node is still present
+            DirectedNode node = nodeMap.get(nodeId);
+            if (node == null) continue;
+
+            // if the node is a sink or source we will remove it and recursively remove all newly
+            // created sinks and sources
+            if (node.isSinkSource()) {
+                removeSinkSource(nodeId);
+                continue;
             }
-            deletedNodes.addAll(newDeletedNodes);
+
+            if (node.isChain()) {
+                int temp = cleanChain(nodeId);
+                if (temp != -1) {
+                    deletedNodes.add(temp);
+                }
+                continue;
+            }
+
+            Set<Integer> triangle = cleanSpecialTriangle(nodeId);
+            if (triangle != null) {
+                deletedNodes.addAll(triangle);
+                continue;
+            }
+
+            if (k - deletedNodes.size() > 2) {
+                int temp = cleanPedals(nodeId, k - deletedNodes.size());
+                if (temp != -1) {
+                    deletedNodes.add(temp);
+                }
+            }
+
         }
+        if (!deletedNodes.isEmpty()) deletedNodes.addAll(cleanGraph(k - deletedNodes.size()));
 
         return deletedNodes;
     }
 
-    public void cleanSinksSources() {
-        Set<Integer> nodes = new HashSet<>(nodeMap.keySet());
-        for (Integer nid : nodes) {
-            DirectedNode node = nodeMap.get(nid);
-            if (node == null) continue;
-            if (node.isSinkSource()) {
-                removeSinkSource(nid);
+    public int cleanChain(int nodeId) {
+        int result = -1;
+        DirectedNode node = nodeMap.get(nodeId);
+        if (node.getInDegree() == 1 && node.getOutDegree() >= 1) {
+            int preNode = node.getInNodes().iterator().next();
+            for (Integer postNode : node.getOutNodes()) {
+                addEdge(preNode, postNode);
+            }
+
+            // If a selfCycle is created we will remove it immediately
+            if (nodeMap.get(preNode).isSelfCycle()) {
+                removeNode(preNode);
+                result = preNode;
+            }
+
+        }
+
+        // If in_degree > 1 and out_degree == 1
+        else {
+            int postNode = node.getOutNodes().iterator().next();
+            for (Integer preNode : node.getInNodes()) {
+                addEdge(preNode, postNode);
+            }
+
+            // If a selfCycle is created we will remove it immediately
+            if (nodeMap.get(postNode).isSelfCycle()) {
+                removeNode(postNode);
+                result = postNode;
             }
         }
-    }
-
-    public Set<Integer> cleanChains() {
-        Set<Integer> selfCycles = new HashSet<>();
-        int chainNode = findChain();
-        while (chainNode != -1) {
-            DirectedNode node = nodeMap.get(chainNode);
-            if (node.getInDegree() == 1 && node.getOutDegree() >= 1) {
-                int preNode = node.getInNodes().iterator().next();
-                for (Integer postNode : node.getOutNodes()) {
-                    addEdge(preNode, postNode);
-                }
-
-                // If a selfCycle is created we will remove it immediately
-                if (nodeMap.get(preNode).isSelfCycle()) {
-                    removeNode(preNode);
-                    selfCycles.add(preNode);
-                }
-            }
-
-            // If in_degree > 1 and out_degree == 1
-            else {
-                int postNode = node.getOutNodes().iterator().next();
-                for (Integer preNode : node.getInNodes()) {
-                    addEdge(preNode, postNode);
-                }
-
-                // If a selfCycle is created we will remove it immediately
-                if (nodeMap.get(postNode).isSelfCycle()) {
-                    removeNode(postNode);
-                    selfCycles.add(postNode);
-                }
-            }
-
-            // Remove the chainNode and search for a new one
-            removeNode(chainNode);
-            chainNode = findChain();
-        }
-        return selfCycles;
-    }
-
-    public int findChain() {
-        for (DirectedNode node : nodeMap.values()) {
-            if (node.getInDegree() == 1 && node.getOutDegree() >= 1) {
-                if (!node.getInNodes().iterator().next().equals(node.getNodeID())) {
-                    return node.getNodeID();
-                }
-            }
-            if (node.getOutDegree() == 1 && node.getInDegree() >= 1) {
-                if (!node.getOutNodes().iterator().next().equals(node.getNodeID())) {
-                    return node.getNodeID();
-                }
-
-            }
-        }
-        return -1;
-    }
-
-    public void calculateAllPedalValues() {
-        Set<Integer> nodes = new HashSet<>(nodeMap.keySet());
-        for (Integer node : nodes) {
-            calculatePetal(node);
-        }
+        removeNode(nodeId);
+        return result;
     }
 
     public Tuple calculatePetal(int nodeId) {
         return Petal.getPetalSet(this, nodeId);
     }
 
-    public Set<Integer> cleanPedals(int k) {
-        Set<Integer> result = new HashSet<>();
-        Set<Integer> nodes = new HashSet<>(nodeMap.keySet());
-        for (Integer nodeId : nodes) {
-
-            if (nodeMap.get(nodeId) == null) continue;
-
+    public int cleanPedals(int nodeId, int k) {
+        if (nodeMap.get(nodeId).getPedal() == 0) {
+            // could have never been calculated
+            calculatePetal(nodeId);
             if (nodeMap.get(nodeId).getPedal() == 0) {
-                // could have never been calculated
-                calculatePetal(nodeId);
-                if (nodeMap.get(nodeId).getPedal() == 0) {
-                    removeNode(nodeId);
-                    continue;
-                }
-            }
-            // possible flower
-            if (nodeMap.get(nodeId).getPedal() > k - result.size()) {
-                // only recalculate if necessary
-                calculatePetal(nodeId);
-                if (nodeMap.get(nodeId).getPedal() > k - result.size()) {
-                    result.add(nodeId);
-                    removeNode(nodeId);
-                }
+                removeNode(nodeId);
+                return -1;
             }
         }
-        return result;
+        // possible flower
+        if (nodeMap.get(nodeId).getPedal() > k) {
+            // only recalculate if necessary
+            calculatePetal(nodeId);
+            if (nodeMap.get(nodeId).getPedal() > k) {
+                removeNode(nodeId);
+                return nodeId;
+            }
+        }
+        return -1;
     }
 
-    public Set<Integer> cleanSpecialTriangle() {
-        Set<Integer> result = new HashSet<>();
-        Set<Integer> nodes = new HashSet<>(nodeMap.keySet());
-        for (Integer nid : nodes) {
-            DirectedNode node = nodeMap.get(nid);
-            if (node == null) continue;
-            if (node.getInDegree() >= 2 && node.getOutDegree() >= 2 && (node.getInDegree() == 2 || node.getOutDegree() == 2)) {
-                Iterator<Integer> outIterator = node.getOutNodes().iterator();
-                int outNode1 = outIterator.next();
-                int outNode2 = outIterator.next();
-                if (node.isTwoCycleWith(outNode1) &&
-                        node.isTwoCycleWith(outNode2) &&
-                        nodeMap.get(outNode1).isTwoCycleWith(outNode2)) {
-                    removeNode(node.getNodeID());
-                    result.add(outNode1);
-                    result.add(outNode2);
-                    removeNode(outNode1);
-                    removeNode(outNode2);
-                }
+    public Set<Integer> cleanSpecialTriangle(int nodeId) {
+        DirectedNode node = nodeMap.get(nodeId);
+        if (node.getInDegree() >= 2 && node.getOutDegree() >= 2 && (node.getInDegree() == 2 || node.getOutDegree() == 2)) {
+            Iterator<Integer> outIterator = node.getOutNodes().iterator();
+            int outNode1 = outIterator.next();
+            int outNode2 = outIterator.next();
+            if (node.isTwoCycleWith(outNode1) &&
+                    node.isTwoCycleWith(outNode2) &&
+                    nodeMap.get(outNode1).isTwoCycleWith(outNode2)) {
+                removeNode(node.getNodeID());
+                Set<Integer> result = new HashSet<>();
+                result.add(outNode1);
+                result.add(outNode2);
+                removeNode(outNode1);
+                removeNode(outNode2);
+                return result;
             }
         }
-        return result;
+        return null;
     }
 
     public boolean addNode(Integer nid) {
