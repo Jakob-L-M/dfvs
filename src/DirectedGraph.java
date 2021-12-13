@@ -167,7 +167,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         }
         removeNode(nodeId);
 
-        int pedal = Pedal.findDisjointPaths(nodeMap, -1, -2);
+        int pedal = Petal.getPetalSet(nodeMap, -1, -2).getValue();
 
         addNode(nodeId);
         for (Integer outNode : nodeMap.get(-1).getOutNodes()) {

@@ -1,13 +1,11 @@
 import java.util.*;
 
-public class Pedal {
+public class Petal {
 
-    public static int findDisjointPaths(Map<Integer, DirectedNode> nodeMap, int source, int sink) {
-        // Residual graph where rGraph[i][j] indicates
-        // residual capacity of edge from i to j (if there
-        // is an edge. If rGraph[i][j] is 0, then there is not)
+    public static Tuple getPetalSet(Map<Integer, DirectedNode> nodeMap, int source, int sink) {
         Map<Integer, Set<Integer>> rGraph = new HashMap<>();
         Map<Integer, Integer> parent = new HashMap<>();
+        Set<Integer> petalSet = new HashSet<>();
 
         for (Integer node : nodeMap.keySet()) {
             rGraph.put(node, new HashSet<>(nodeMap.get(node).getOutNodes()));
@@ -19,12 +17,13 @@ public class Pedal {
             int cur = parent.get(sink);
             while (cur != source) {
                 rGraph.remove(cur);
+                petalSet.add(cur);
                 cur = parent.get(cur);
             }
             max_flow += 1;
             parent.clear();
         }
-        return max_flow;
+        return new Tuple(max_flow, petalSet);
     }
 
     private static boolean bfs(Map<Integer, Set<Integer>> rGraph, int source, int sink, Map<Integer, Integer> parent) {
@@ -42,6 +41,7 @@ public class Pedal {
                 for (int outNode : rGraph.get(current)) {
                     if (!visited.contains(outNode)) {
                         parent.put(outNode, current);
+                        // reached sink - break here
                         if (outNode == sink) {
                             return true;
                         }
@@ -51,10 +51,6 @@ public class Pedal {
                 }
             }
         }
-
-        // If we reached sink in BFS
-        // starting from source, then
-        // return true, else false
         return visited.contains(sink);
     }
 }
