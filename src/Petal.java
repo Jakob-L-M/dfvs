@@ -52,6 +52,7 @@ public class Petal {
 
         graph.nodeMap.get(nodeId).setPedal(max_flow);
 
+        petalSet.add(nodeId);
         return new Tuple(max_flow, petalSet);
     }
 
