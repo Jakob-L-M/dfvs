@@ -21,19 +21,19 @@ public class DirectedNode {
         this.outNodes.addAll(that.getOutNodes());
     }
 
-    public boolean addPreNode(Integer pre) {
+    public boolean addInNode(Integer pre) {
         return inNodes.add(pre);
     }
 
-    public boolean addPostNode(Integer post) {
+    public boolean addOutNode(Integer post) {
         return outNodes.add(post);
     }
 
-    public boolean removePreNode(Integer pre) {
+    public boolean removeInNode(Integer pre) {
         return inNodes.remove(pre);
     }
 
-    public boolean removePostNode(Integer post) {
+    public boolean removeOutNode(Integer post) {
         return outNodes.remove(post);
     }
 
@@ -106,10 +106,10 @@ public class DirectedNode {
     public DirectedNode clone() {
         DirectedNode nodeCopy = new DirectedNode(this.nodeID);
         for(int postNode : this.outNodes) {
-            nodeCopy.addPostNode(postNode);
+            nodeCopy.addOutNode(postNode);
         }
         for(int preNode : this.inNodes) {
-            nodeCopy.addPreNode(preNode);
+            nodeCopy.addInNode(preNode);
         }
         return nodeCopy;
     }

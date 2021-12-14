@@ -8,14 +8,9 @@ import java.util.*;
 
 
 public class DirectedGraph implements Comparable<DirectedGraph> {
+    final Stack<StackTuple> stack = new Stack<>();
     Map<Integer, DirectedNode> nodeMap = new HashMap<>();
     BiMap<String, Integer> dict = HashBiMap.create();
-
-    public DirectedGraph(Collection<DirectedNode> nodes) {
-        for (DirectedNode node : nodes) {
-            nodeMap.put(node.getNodeID(), node);
-        }
-    }
 
     DirectedGraph(String fileName) {
         try {
@@ -54,10 +49,6 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
     public DirectedGraph(BiMap<String, Integer> dict) {
         this.dict = dict;
-    }
-
-    public DirectedGraph() {
-
     }
 
     public Set<Integer> cleanGraph(int k) {
@@ -112,6 +103,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
     /**
      * removes a chain and checks for selfCycles. If a selfCycle is generated if is remove immediately.
+     *
      * @param nodeId id of a chain node. Method requires that the nodeId has been checked to be a chain.
      *               Use .isChain()
      * @return nodeId of a removed selfCycle, -1 if no selfCycle was generated.
@@ -152,6 +144,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
     /**
      * Calculates the max-flow value of a node and finds all petal nodes.
+     *
      * @param nodeId id of the node that should be calculated
      * @return Tuple. Tuple.value() gives the max-flow, Tuple.set() is a set of all nodes
      * present in any flower leave or the flower center itself.
@@ -164,8 +157,9 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
      * checks if a flower is present and removes that flower. Also removes a node
      * if that node is not in any circle. The petal value of a node will only be
      * updated if a potential flower is found.
+     *
      * @param nodeId id of the node that should be cleaned
-     * @param k maximum budget for cleaning
+     * @param k      maximum budget for cleaning
      * @return nodeId if node has been clean or -1 if not
      */
     public int cleanPetal(int nodeId, int k) {
@@ -186,7 +180,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         if (nodeMap.get(nodeId).getPedal() > k) {
 
             // only recalculate if necessary
-            if(!recalculated) calculatePetal(nodeId);
+            if (!recalculated) calculatePetal(nodeId);
 
             if (nodeMap.get(nodeId).getPedal() > k) {
                 removeNode(nodeId);
@@ -200,6 +194,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
     /**
      * cleans a semi pendant triangle at a given node
+     *
      * @param nodeId id of the node that should be cleaned
      * @return Set of cleaned nodeIds, null if no triangle was found
      */
@@ -232,34 +227,96 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return false;
     }
 
-    public boolean addEdge(Integer preID, Integer postID) {
+    public boolean addEdge(Integer preID, Integer postID, boolean stack) {
         DirectedNode preNode = nodeMap.get(preID);
         DirectedNode postNode = nodeMap.get(postID);
-        return preNode.addPostNode(postID) &&
-                postNode.addPreNode(preID);
+        boolean added = preNode.addOutNode(postID) &&
+                postNode.addInNode(preID);
+        if (stack && added) {
+            this.stack.push(new StackTuple(true, preID, postID));
+        }
+        return added;
     }
 
-    public boolean removeEdge(Integer preID, Integer postID) {
+    public boolean addEdge(Integer preID, Integer postID) {
+        return addEdge(preID, postID, true);
+    }
+
+    public boolean removeEdge(Integer preID, Integer postID, boolean stack) {
         if (nodeMap.containsKey(preID) && nodeMap.containsKey(postID)) {
-            nodeMap.get(preID).removePostNode(postID);
-            nodeMap.get(postID).removePreNode(preID);
+            if (stack) {
+                this.stack.push(new StackTuple(false, preID, postID));
+            }
+            nodeMap.get(preID).removeOutNode(postID);
+            nodeMap.get(postID).removeInNode(preID);
             return true;
         }
         return false;
     }
 
-    public boolean removeNode(Integer nodeID) {
+    public boolean removeEdge(Integer preID, Integer postID) {
+        return removeEdge(preID, postID, true);
+    }
+
+    public boolean removeNode(Integer nodeID, boolean stack) {
         if (!nodeMap.containsKey(nodeID)) return false;
         DirectedNode node = nodeMap.get(nodeID);
 
+        if (stack) {
+            // false since node was removed
+            this.stack.push(new StackTuple(false, node));
+        }
+
         for (Integer preNode : node.getInNodes()) {
-            nodeMap.get(preNode).removePostNode(nodeID);
+            nodeMap.get(preNode).removeOutNode(nodeID);
         }
         for (Integer postNode : node.getOutNodes()) {
-            nodeMap.get(postNode).removePreNode(nodeID);
+            nodeMap.get(postNode).removeInNode(nodeID);
         }
         nodeMap.remove(nodeID);
         return true;
+    }
+
+    public boolean removeNode(Integer nodeID) {
+        return removeNode(nodeID, true);
+    }
+
+    public void addStackCheckpoint() {
+        stack.push(null);
+    }
+
+    public void rebuildGraph() {
+        while (!stack.isEmpty()) {
+            StackTuple stackTuple = stack.pop();
+
+            if (stackTuple == null) {
+                //checkpoint reached
+                return;
+            }
+
+            if (stackTuple.type == StackTuple.GraphType.NODE) {
+                // node are always removed and never added
+
+                int nodeId = stackTuple.nodeId;
+
+                addNode(nodeId); //only added if not present
+
+                for (Integer outNode : stackTuple.outNodes) {
+                    addNode(outNode); //only added if not present
+                    addEdge(nodeId, outNode, false);
+                }
+
+                for (Integer inNode : stackTuple.inNodes) {
+                    addNode(inNode); //only added if not present
+                    addEdge(inNode, nodeId, false);
+                }
+            } else if (stackTuple.type == StackTuple.GraphType.EDGE) {
+                // edges are always added (chain cleaning)
+                removeEdge(stackTuple.from, stackTuple.to, false);
+            }
+        }
+        //should never reach here
+        System.out.println("Stack empty");
     }
 
     public void removeSinkSource(Integer nodeID) {
@@ -272,7 +329,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             for (Integer inNodeId : inNodes) {
                 DirectedNode inNode = nodeMap.get(inNodeId);
                 if (inNode == null) continue;
-                inNode.removePostNode(nodeID);
+                inNode.removeOutNode(nodeID);
                 if (inNode.isSinkSource()) {
                     removeSinkSource(inNodeId);
                 }
@@ -283,12 +340,16 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             for (Integer outNodeId : outNodes) {
                 DirectedNode outNode = nodeMap.get(outNodeId);
                 if (outNode == null) continue;
-                outNode.removePreNode(nodeID);
+                outNode.removeInNode(nodeID);
                 if (outNode.isSinkSource()) {
                     removeSinkSource(outNodeId);
                 }
             }
         }
+    }
+
+    public void clearStack() {
+        stack.clear();
     }
 
     @Override
@@ -381,27 +442,6 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return hash.toString();
     }
 
-    public DirectedGraph inducedSubGraph(Set<Integer> nodes) {
-        BiMap<String, Integer> inverseDict = dict;
-        DirectedGraph subGraph = new DirectedGraph(inverseDict);
-        for (Integer n : nodes) {
-            subGraph.addNode(n);
-        }
-        for (Integer u : nodes) {
-            DirectedNode uNode = getNode(u);
-            for (Integer v : uNode.getInNodes()) {
-                if (subGraph.containsNode(v)) {
-                    subGraph.addEdge(v, u);
-                }
-            }
-            for (Integer v : uNode.getOutNodes()) {
-                if (subGraph.containsNode(v)) {
-                    subGraph.addEdge(u, v);
-                }
-            }
-        }
-        return subGraph;
-    }
 
 
     @Override
