@@ -277,6 +277,14 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return true;
     }
 
+    public boolean removeAllNodes(Set<Integer> nodesToRemove) {
+        boolean success = true;
+        for (Integer u : nodesToRemove) {
+            success = success && removeNode(u);
+        }
+        return success;
+    }
+
     public boolean removeNode(Integer nodeID) {
         return removeNode(nodeID, true);
     }
@@ -364,25 +372,32 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     }
 
     public Deque<Integer> findBestCycle() {
-        HashMap<Integer, Boolean> visited = new HashMap<>();
-        HashMap<Integer, Integer> parent = new HashMap<>();
+        for (Integer i : nodeMap.keySet()) {
+            if (getNode(i).isTwoCycle() != -1) {
+                Deque<Integer> twoCycle = new ArrayDeque<>();
+                twoCycle.add(i);
+                twoCycle.add(getNode(i).isTwoCycle());
+                return twoCycle;
+            }
+        }
+        Set<Integer> visited = new HashSet<>();
+        Map<Integer, Integer> parent = new HashMap<>();
         Deque<Integer> cycle = new ArrayDeque<>();
         for (Integer i : nodeMap.keySet()) {
-            visited.put(i, false);
             parent.put(i, -1);
         }
         for (Integer start : nodeMap.keySet()) {
-            if (visited.get(start)) continue;
+            if (visited.contains(start)) continue;
             Deque<Integer> queue = new ArrayDeque<>();
             Deque<Integer> tempCycle = new ArrayDeque<>();
             queue.add(start);
-            visited.put(start, true);
+            visited.add(start);
             while (!queue.isEmpty()) {
                 Integer u = queue.pop();
                 for (Integer v : nodeMap.get(u).getOutNodes()) {
-                    if (!visited.get(v)) {
+                    if (!visited.contains(v)) {
                         parent.put(v, u);
-                        visited.put(v, true);
+                        visited.add(v);
                         queue.add(v);
                     }
                     if (v.equals(start)) {
@@ -405,7 +420,9 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             } else {
                 nodesLeft = tempCycle;
             }
-            if (tempCycle.size() == 2) return tempCycle;
+            if (tempCycle.size() <= 3 && !tempCycle.isEmpty()) {
+                return tempCycle;
+            }
             if (cycle.isEmpty() || (cycle.size() > nodesLeft.size() && nodesLeft.size() > 1)) {
                 cycle = nodesLeft;
             }

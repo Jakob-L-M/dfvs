@@ -7,7 +7,7 @@ public class Main {
     public static Set<Integer> dfvsBranch(DirectedGraph graph, int k, boolean isScc) {
 
         Packing stacking = new Packing(graph);
-        stacking.findCirclePacking();
+        stacking.findCyclePacking();
         int lowerBound = stacking.getLowerBound();
         if (k < lowerBound) return null;
 
@@ -96,7 +96,7 @@ public class Main {
             scc.clearStack();
 
             Packing stacking = new Packing(scc);
-            stacking.findCirclePacking();
+            stacking.findCyclePacking();
             int k = stacking.getLowerBound();
 
             Set<Integer> dfvs = null;
@@ -126,6 +126,8 @@ public class Main {
     }
 
     public static void main(String[] args) {
+
+        /*
         developMain("instances/complex/chess-n_1000 "); // 60
         developMain("instances/complex/health-n_1000");// 232
         developMain("instances/complex/link-kv-n_300"); // 55
@@ -138,10 +140,14 @@ public class Main {
         developMain("instances/synthetic/synth-n_60-m_386-k_4-p_0.2.txt"); // 4
         developMain("instances/synthetic/synth-n_200-m_1172-k_20-p_0.05.txt"); // 20
         developMain("instances/synthetic/synth-n_100-m_1235-k_20-p_0.2.txt"); // 20
-        developMain("instances/synthetic/synth-n_90-m_327-k_30-p_0.05.txt"); // 14
+        //developMain("instances/synthetic/synth-n_90-m_327-k_30-p_0.05.txt"); // 14
 
-        /*
-        developMain("instances/synthetic/synth-n_50-m_357-k_20-p_0.2.txt");//20
+
+
+         */
+        //developMain("instances/synthetic/synth-n_50-m_357-k_20-p_0.2.txt");//20
+        //developMain("instances/synthetic/synth-n_140-m_1181-k_20-p_0.1.txt"); //20
+        //developMain("instances/synthetic/synth-n_120-m_492-k_30-p_0.05.txt"); //21
         /*
         DirectedGraph graph = new DirectedGraph(
                 args[0]);
