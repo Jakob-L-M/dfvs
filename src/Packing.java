@@ -2,12 +2,10 @@ import java.util.*;
 
 public class Packing {
     private final DirectedGraph graph;
-    private final DirectedGraph graphFixed;
     private final Set<Deque<Integer>> costlySubGraphs;
 
     Packing(DirectedGraph graph) {
         this.graph = graph;
-        graphFixed = new DirectedGraph(graph);
         costlySubGraphs = new HashSet<>();
     }
 
@@ -33,8 +31,8 @@ public class Packing {
                 Integer u = triplet.get(0);
                 Integer v = triplet.get(1);
                 Integer w = triplet.get(2);
-                if (graphFixed.hasEdge(u, v) && graphFixed.hasEdge(v, u) && graphFixed.hasEdge(u, w)
-                    && graphFixed.hasEdge(w, u) && graphFixed.hasEdge(v, w) && graphFixed.hasEdge(w, v)) {
+                if (graph.hasEdge(u, v) && graph.hasEdge(v, u) && graph.hasEdge(u, w)
+                    && graph.hasEdge(w, u) && graph.hasEdge(v, w) && graph.hasEdge(w, v)) {
                     System.out.println("3-Digraph found");
                     lowerBound++;
                 }

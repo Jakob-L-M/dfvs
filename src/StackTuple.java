@@ -19,8 +19,8 @@ public class StackTuple {
         this.added = added;
         this.type = GraphType.NODE;
         this.nodeId = node.getNodeID();
-        this.outNodes = new HashSet<>(node.getOutNodes());
-        this.inNodes = new HashSet<>(node.getInNodes());
+        this.outNodes =node.getOutNodes();
+        this.inNodes = node.getInNodes();
     }
 
     public StackTuple(boolean added, int from, int to) {
