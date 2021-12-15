@@ -142,6 +142,12 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return result;
     }
 
+    public void calculateAllPetals() {
+        for (Integer nodeId : new HashSet<>(nodeMap.keySet())) {
+            calculatePetal(nodeId);
+        }
+    }
+
     /**
      * Calculates the max-flow value of a node and finds all petal nodes.
      *
@@ -373,10 +379,16 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
     public Deque<Integer> findBestCycle() {
         for (Integer i : nodeMap.keySet()) {
-            if (getNode(i).isTwoCycle() != -1) {
+            int twoCycleNodeId = getNode(i).isTwoCycle();
+            if (twoCycleNodeId != -1) {
                 Deque<Integer> twoCycle = new ArrayDeque<>();
+                if (nodeMap.get(i).isFixed() || nodeMap.get(twoCycleNodeId).isFixed()) {
+                    // selfCycle
+                    //TODO
+                    // remove unfixed, add 1 cost
+                }
                 twoCycle.add(i);
-                twoCycle.add(getNode(i).isTwoCycle());
+                twoCycle.add(twoCycleNodeId);
                 return twoCycle;
             }
         }

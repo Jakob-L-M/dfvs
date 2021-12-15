@@ -1,4 +1,3 @@
-import java.util.HashSet;
 import java.util.Set;
 
 public class StackTuple {
@@ -19,7 +18,7 @@ public class StackTuple {
         this.added = added;
         this.type = GraphType.NODE;
         this.nodeId = node.getNodeID();
-        this.outNodes =node.getOutNodes();
+        this.outNodes = node.getOutNodes();
         this.inNodes = node.getInNodes();
     }
 
