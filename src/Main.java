@@ -34,14 +34,15 @@ public class Main {
         if (cycle == null) {
 
             // The graph does not have any cycles
-            // We will return the found selfCycles if they are in our current limit
+            // We will return the found selfCycles
             return selfCycles;
 
         }
 
+
         Map<Integer, List<Integer>> sortedCycle = new HashMap<>();
         for (Integer v : cycle) {
-            graph.calculatePedalValue(v);
+            graph.calculatePetal(v);
             if (!sortedCycle.containsKey(graph.getNode(v).getPedal())) {
                 sortedCycle.put(graph.getNode(v).getPedal(), new ArrayList<>());
             }
@@ -50,14 +51,14 @@ public class Main {
         List<Integer> pedalValues = new ArrayList<>(sortedCycle.keySet());
         pedalValues.sort(Collections.reverseOrder());
 
+
         for (Integer i : pedalValues) {
 
             for (Integer v : sortedCycle.get(i)) {
-                // create a copy -> we will branch off of that copy
-                DirectedGraph graphCopy = new DirectedGraph(graph);
 
                 // delete a vertex of the circle and branch for here
-                graphCopy.removeNode(v);
+                graph.addStackCheckpoint();
+                graph.removeNode(v);
 
                 // increment recursions to keep track of tree size
                 recursions++;
@@ -65,7 +66,7 @@ public class Main {
                 // branch with a maximum cost of k
                 // -1: Just deleted a node
                 // -selfCycles.size(): nodes that where removed during graph reduction
-                Set<Integer> dfvs = dfvsBranch(graphCopy, k - 1, false);
+                Set<Integer> dfvs = dfvsBranch(graph, k - 1, false);
 
                 // if there is a valid solution in the recursion it will be returned
                 if (dfvs != null) {
@@ -76,6 +77,7 @@ public class Main {
 
                     return dfvs;
                 } else {
+                    graph.rebuildGraph();
                     graph.getNode(v).fixNode();
                 }
             }
@@ -85,18 +87,25 @@ public class Main {
 
     public static Set<Integer> dfvsSolve(DirectedGraph graph) {
         Set<Integer> allDfvs = graph.cleanGraph(Integer.MAX_VALUE);
+        graph.clearStack();
         Set<DirectedGraph> SCCs = new Tarjan(graph).getSCCGraphs();
+        graph.clearStack();
 
         for (DirectedGraph scc : SCCs) {
             allDfvs.addAll(scc.cleanGraph(Integer.MAX_VALUE));
+            scc.clearStack();
+
             Packing stacking = new Packing(scc);
             stacking.findCirclePacking();
             int k = stacking.getLowerBound();
+
             Set<Integer> dfvs = null;
 
             while (dfvs == null) {
+                scc.addStackCheckpoint();
                 dfvs = dfvsBranch(scc, k, true);
                 k++;
+                scc.rebuildGraph();
             }
             allDfvs.addAll(dfvs);
         }
@@ -106,10 +115,10 @@ public class Main {
 
     public static void developMain(String file) {
         DirectedGraph graph = new DirectedGraph(file);
+        graph.clearStack();
         System.out.println("Solving: " + file);
         long time = -System.nanoTime();
-        Set<Integer> solution = dfvsSolve(graph);
-        System.out.println("\tk: " + solution.size());
+        System.out.println("\tk: " + dfvsSolve(graph).size());
         System.out.println("\t#recursive steps: " + recursions);
         double sec = utils.round((time + System.nanoTime()) / 1_000_000_000.0, 4);
         System.out.println("\ttime: " + sec);
@@ -117,14 +126,21 @@ public class Main {
     }
 
     public static void main(String[] args) {
-        /*
-        developMain("instances/complex/chess-n_1000 "); //60
-        developMain("instances/complex/biology-n_35-m_315-p_0.75-18");//15
-        developMain("instances/complex/link-kv-n_300"); //55
-        developMain("instances/complex/biology-n_30-m_287-p_0.5-5"); //15
-        developMain("instances/complex/biology-n_35-m_315-p_0.5-18"); //17
+        developMain("instances/complex/chess-n_1000 "); // 60
+        developMain("instances/complex/health-n_1000");// 232
+        developMain("instances/complex/link-kv-n_300"); // 55
+        developMain("instances/complex/biology-n_25-m_231-p_0.9-6"); // 8
+        developMain("instances/complex/biology-n_30-m_287-p_0.5-5"); // 15
+        developMain("instances/complex/biology-n_35-m_315-p_0.5-18"); // 17
 
-         */
+        developMain("instances/synthetic/synth-n_40-m_203-k_8-p_0.2.txt"); // 7
+        developMain("instances/synthetic/synth-n_60-m_110-k_2-p_0.05.txt");// 1
+        developMain("instances/synthetic/synth-n_60-m_386-k_4-p_0.2.txt"); // 4
+        developMain("instances/synthetic/synth-n_200-m_1172-k_20-p_0.05.txt"); // 20
+        developMain("instances/synthetic/synth-n_100-m_1235-k_20-p_0.2.txt"); // 20
+        developMain("instances/synthetic/synth-n_90-m_327-k_30-p_0.05.txt"); // 14
+
+        /*
         developMain("instances/synthetic/synth-n_50-m_357-k_20-p_0.2.txt");//20
         /*
         DirectedGraph graph = new DirectedGraph(
@@ -141,17 +157,23 @@ public class Main {
 }
 /*
 Solving: instances/complex/chess-n_1000
-k: 60
-#recursive steps: 167710 - 24974
-time: 0:19.70 - 17.2822
-
-Solving: instances/complex/biology-n_35-m_315-p_0.5-18
-k: 17
-#recursive steps: 996892 - 27353
-time: 0:50.35 - 11.5849
-
+	k: 60
+	#recursive steps: 14805
+	time: 11.1876
 Solving: instances/complex/biology-n_35-m_315-p_0.75-18
-k: 15
-#recursive steps: 266033 - 23847
-time: 0:15.13 - 8.8515
+	k: 15
+	#recursive steps: 34718
+	time: 6.6971
+Solving: instances/complex/link-kv-n_300
+	k: 55
+	#recursive steps: 120
+	time: 0.009
+Solving: instances/complex/biology-n_30-m_287-p_0.5-5
+	k: 15
+	#recursive steps: 32768
+	time: 5.4951
+Solving: instances/complex/biology-n_35-m_315-p_0.5-18
+	k: 17
+	#recursive steps: 42901
+	time: 9.4446
  */

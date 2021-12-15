@@ -6,22 +6,24 @@ public class Petal {
         graph.addNode(-1); //source
         graph.addNode(-2); //sink
 
-        for (Integer outNode : graph.nodeMap.get(nodeId).getOutNodes()) {
-            graph.addEdge(-1, outNode);
+        DirectedNode node = graph.nodeMap.get(nodeId);
+
+        for (Integer outNode : node.getOutNodes()) {
+            graph.addEdge(-1, outNode, false);
         }
 
-        for (Integer inNode : graph.nodeMap.get(nodeId).getInNodes()) {
-            graph.addEdge(inNode, -2);
+        for (Integer inNode : node.getInNodes()) {
+            graph.addEdge(inNode, -2, false);
         }
 
-        graph.removeNode(nodeId);
+        graph.removeNode(nodeId, false);
 
         Map<Integer, Set<Integer>> rGraph = new HashMap<>();
         Map<Integer, Integer> parent = new HashMap<>();
         Set<Integer> petalSet = new HashSet<>();
 
-        for (Integer node : graph.nodeMap.keySet()) {
-            rGraph.put(node, new HashSet<>(graph.nodeMap.get(node).getOutNodes()));
+        for (Integer nodes : graph.nodeMap.keySet()) {
+            rGraph.put(nodes, graph.nodeMap.get(nodes).getOutNodes());
         }
 
         int max_flow = 0;
@@ -39,16 +41,16 @@ public class Petal {
 
         graph.addNode(nodeId);
 
-        for (Integer outNode : graph.nodeMap.get(-1).getOutNodes()) {
-            graph.addEdge(nodeId, outNode);
+        for (Integer outNode : node.getOutNodes()) {
+            graph.addEdge(nodeId, outNode, false);
         }
 
-        for (Integer inNode : graph.nodeMap.get(-2).getInNodes()) {
-            graph.addEdge(inNode, nodeId);
+        for (Integer inNode : node.getInNodes()) {
+            graph.addEdge(inNode, nodeId, false);
         }
 
-        graph.removeNode(-1);
-        graph.removeNode(-2);
+        graph.removeNode(-1, false);
+        graph.removeNode(-2, false);
 
         graph.nodeMap.get(nodeId).setPedal(max_flow);
 
