@@ -21,7 +21,7 @@ public class Packing {
         DirectedGraph graph = new DirectedGraph("instances/complex/usairport-n_800");
         Packing packing = new Packing(graph);
         System.out.println(packing.getDigraphs());
-        System.out.println(packing.getRealDigraphs());
+        System.out.println(packing.getMixedStruct());
         System.out.println(packing.mixedStructs.size());
         System.out.println(packing.digraphs);
         /*Set<Integer> safeDigraphDeletions = packing.getSafeToDeleteDigraphNodes();
@@ -177,7 +177,7 @@ public class Packing {
         return digraphs;
     }
 
-    public Set<Set<Integer>> getRealDigraphs() {
+    public Set<Set<Integer>> getMixedStruct() {
         graph.addStackCheckpoint();
         Set<Set<Integer>> digraphs = new HashSet<>();
         Set<Integer> nodes = graph.nodeMap.keySet();

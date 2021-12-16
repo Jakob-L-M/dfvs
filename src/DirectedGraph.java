@@ -300,6 +300,19 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return allContained;
     }
 
+    public Set<Set<Integer>> cleanDigraphSet (Set<Set<Integer>> digraphs) {
+        Set<Set<Integer>> cleanedDigraphs = new HashSet<>();
+        for (Set<Integer> digraph : digraphs) {
+            if (digraph.size() < 3) continue;
+            boolean containsAll = true;
+            for (Integer nodeID : digraph) {
+                if (!nodeMap.containsKey(nodeID)) containsAll = false;
+            }
+            if (containsAll) cleanedDigraphs.add(digraph);
+        }
+        return cleanedDigraphs;
+    }
+
     public boolean removeNode(Integer nodeID) {
         return removeNode(nodeID, true);
     }

@@ -52,7 +52,7 @@ public class Main {
         }
 
         Packing packing = new Packing(graph);
-
+/*
         packing.getDigraphs();
         Set<Integer> safeDiGraphNodes = packing.getSafeToDeleteDigraphNodes();
         if (safeDiGraphNodes.size() > k) {
@@ -61,8 +61,8 @@ public class Main {
         k = k - safeDiGraphNodes.size();
         graph.removeAllNodes(safeDiGraphNodes);
 
-        packing = new Packing(graph);
-        if (Math.max(packing.findCyclePacking().size(), packing.lowerDigraphBound()) > k) {
+        packing = new Packing(graph);*/
+        if (/*Math.max(*/packing.findCyclePacking().size()/*, packing.lowerDigraphBound())*/ > k) {
             return null;
         }
 
@@ -73,73 +73,95 @@ public class Main {
             fullDigraphs.remove(digraph);
         }
         */
-
-        // find a Cycle
-        Deque<Integer> cycle = graph.findBestCycle();
-
-        if (cycle == null) {
-            // The graph does not have any cycles
-            // We will return the found cleanedNodes
-            //cleanedNodes.addAll(safeDiGraphNodes);
-            return cleanedNodes;
+//Start Digraphunsinn
+        if (!fullDigraphs.isEmpty()) {
+            fullDigraphs = graph.cleanDigraphSet(fullDigraphs);
         }
-
-
-        Map<Integer, List<Integer>> sortedCycle = new HashMap<>();
-        /*
-        Set<Integer> struct = new HashSet<>();
-        if (digraph != null) {
-            if (graph.hasAllNodes(digraph)) {
-                struct = digraph;
-            }
-            else {
-                struct.addAll(cycle);
-            }
-        }
-        else {
-            struct.addAll(cycle);
-        }
-
-         */
-        for (Integer v : cycle) {
-            graph.calculatePetal(v);
-            if (!sortedCycle.containsKey(graph.getNode(v).getPedal())) {
-                sortedCycle.put(graph.getNode(v).getPedal(), new ArrayList<>());
-            }
-            sortedCycle.get(graph.getNode(v).getPedal()).add(v);
-        }
-        List<Integer> pedalValues = new ArrayList<>(sortedCycle.keySet());
-        pedalValues.sort(Collections.reverseOrder());
-
-
-        for (Integer i : pedalValues) {
-
-            for (Integer v : sortedCycle.get(i)) {
-
+        Set<Integer> digraph = new HashSet<>();
+        if (!fullDigraphs.isEmpty()) {
+            digraph = fullDigraphs.stream().iterator().next();
+            //System.out.println(digraph);
+            for (Integer v : digraph) {
                 // delete a vertex of the circle and branch for here
                 graph.addStackCheckpoint();
-                graph.removeNode(v);
-
+                Set<Integer> digraphWithoutV = new HashSet<>(digraph);
+                digraphWithoutV.remove(v);
+                graph.removeAllNodes(digraph);
                 // increment recursions to keep track of tree size
                 recursions++;
 
                 // branch with a maximum cost of k
                 // -1: Just deleted a node
                 // -cleanedNodes.size(): nodes that where removed during graph reduction
-                Set<Integer> dfvs = dfvsBranch(graph, k - 1, false);
+                Set<Integer> dfvs = dfvsBranch(graph, k - digraphWithoutV.size(), false);
 
-                // if there is a valid solution in the recursion it will be returned
-                if (dfvs != null) {
+                    // if there is a valid solution in the recursion it will be returned
+                    if (dfvs != null) {
 
-                    // Add the nodeId of the valid solution and all cleanedNodes
-                    dfvs.add(v);
-                    dfvs.addAll(cleanedNodes);
-                    //dfvs.addAll(safeDiGraphNodes);
+                        // Add the nodeId of the valid solution and all cleanedNodes
+                        dfvs.addAll(digraphWithoutV);
+                        dfvs.addAll(cleanedNodes);
+                        //dfvs.addAll(safeDiGraphNodes);
 
-                    return dfvs;
-                } else {
-                    graph.rebuildGraph();
-                    graph.getNode(v).fixNode();
+                        return dfvs;
+                    } else {
+                        graph.rebuildGraph();
+                    }
+                }
+            }
+        else { //Ende Digraphunsinn
+            // find a Cycle
+            Deque<Integer> cycle = graph.findBestCycle();
+
+            if (cycle == null) {
+                // The graph does not have any cycles
+                // We will return the found cleanedNodes
+                //cleanedNodes.addAll(safeDiGraphNodes);
+                return cleanedNodes;
+            }
+
+
+            Map<Integer, List<Integer>> sortedCycle = new HashMap<>();
+            for (Integer v : cycle) {
+                graph.calculatePetal(v);
+                if (!sortedCycle.containsKey(graph.getNode(v).getPedal())) {
+                    sortedCycle.put(graph.getNode(v).getPedal(), new ArrayList<>());
+                }
+                sortedCycle.get(graph.getNode(v).getPedal()).add(v);
+            }
+            List<Integer> pedalValues = new ArrayList<>(sortedCycle.keySet());
+            pedalValues.sort(Collections.reverseOrder());
+
+
+            for (Integer i : pedalValues) {
+
+                for (Integer v : sortedCycle.get(i)) {
+
+                    // delete a vertex of the circle and branch for here
+                    graph.addStackCheckpoint();
+                    graph.removeNode(v);
+
+                    // increment recursions to keep track of tree size
+                    recursions++;
+
+                    // branch with a maximum cost of k
+                    // -1: Just deleted a node
+                    // -cleanedNodes.size(): nodes that where removed during graph reduction
+                    Set<Integer> dfvs = dfvsBranch(graph, k - 1, false);
+
+                    // if there is a valid solution in the recursion it will be returned
+                    if (dfvs != null) {
+
+                        // Add the nodeId of the valid solution and all cleanedNodes
+                        dfvs.add(v);
+                        dfvs.addAll(cleanedNodes);
+                        //dfvs.addAll(safeDiGraphNodes);
+
+                        return dfvs;
+                    } else {
+                        graph.rebuildGraph();
+                        graph.getNode(v).fixNode();
+                    }
                 }
             }
         }
@@ -183,8 +205,10 @@ public class Main {
             allDfvs.addAll(scc.cleanGraph(Integer.MAX_VALUE));
             scc.clearStack();
 
-            Packing stacking = new Packing(scc);
-            int k = stacking.findCyclePacking().size();
+            Packing sccPacking = new Packing(scc);
+            int k = sccPacking.findCyclePacking().size();
+
+            fullDigraphs = packing.getDigraphs();
 
             Set<Integer> dfvs = null;
 
@@ -215,11 +239,11 @@ public class Main {
     public static void main(String[] args) {
 /*
         File file = new File("instances/complex");
-
-        /*
         for (File inst : file.listFiles()) {
             developMain(inst.getPath());
         }
+*/
+/*
 
         developMain("instances/complex/chess-n_1000 "); // 60
         developMain("instances/complex/health-n_1000");// 232
@@ -237,6 +261,9 @@ public class Main {
 
 
 
+
+        developMain("instances/synthetic/synth-n_160-m_683-k_8-p_0.05.txt"); //6
+
         developMain("instances/synthetic/synth-n_50-m_357-k_20-p_0.2.txt");//20
         developMain("instances/synthetic/synth-n_140-m_1181-k_20-p_0.1.txt"); //20
         developMain("instances/synthetic/synth-n_120-m_492-k_30-p_0.05.txt"); //21
@@ -251,7 +278,6 @@ public class Main {
             }
         }
         System.out.println("#recursive steps: " + recursions);
-
     }
 }
 /*
