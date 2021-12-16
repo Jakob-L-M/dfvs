@@ -291,6 +291,15 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return success;
     }
 
+    public boolean hasAllNodes(Set<Integer> nodes) {
+        boolean allContained = true;
+        for (Integer u : nodes) {
+            allContained = allContained && nodeMap.containsKey(u);
+            if (!allContained) return false;
+        }
+        return allContained;
+    }
+
     public boolean removeNode(Integer nodeID) {
         return removeNode(nodeID, true);
     }

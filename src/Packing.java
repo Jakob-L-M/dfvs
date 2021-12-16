@@ -5,6 +5,7 @@ public class Packing {
     private final List<Deque<Integer>> costlySubGraphs;
     private DirectedGraph graph;
     private Set<Set<Integer>> digraphs;
+    private Set<Set<Integer>> mixedStructs;
     private Set<Integer> safeToDeleteDigraphNodes;
 
     Packing(DirectedGraph graph) {
@@ -16,10 +17,14 @@ public class Packing {
     }
 
     public static void main(String[] args) {
-        DirectedGraph graph = new DirectedGraph("instances/synthetic/synth-n_140-m_1181-k_20-p_0.1.txt");
+        //DirectedGraph graph = new DirectedGraph("instances/synthetic/synth-n_140-m_1181-k_20-p_0.1.txt");
+        DirectedGraph graph = new DirectedGraph("instances/complex/usairport-n_800");
         Packing packing = new Packing(graph);
         System.out.println(packing.getDigraphs());
-        Set<Integer> safeDigraphDeletions = packing.getSafeToDeleteDigraphNodes();
+        System.out.println(packing.getRealDigraphs());
+        System.out.println(packing.mixedStructs.size());
+        System.out.println(packing.digraphs);
+        /*Set<Integer> safeDigraphDeletions = packing.getSafeToDeleteDigraphNodes();
         System.out.println(safeDigraphDeletions);
 
         packing.graph = new DirectedGraph(packing.graph);
@@ -48,7 +53,7 @@ public class Packing {
 
 
 
-
+*/
 
         /*File complexInstances = new File("instances/complex");
         long time = -System.nanoTime();
@@ -170,6 +175,28 @@ public class Packing {
         this.digraphs = digraphs;
         graph.rebuildGraph();
         return digraphs;
+    }
+
+    public Set<Set<Integer>> getRealDigraphs() {
+        graph.addStackCheckpoint();
+        Set<Set<Integer>> digraphs = new HashSet<>();
+        Set<Integer> nodes = graph.nodeMap.keySet();
+        while (!graph.nodeMap.isEmpty()) {
+            Integer u = nodes.stream().iterator().next();
+            Set<Integer> a = expand(u);
+            if (a.size() > 1) digraphs.add(a);
+            for (Integer i : a) {
+                graph.removeNode(i);
+            }
+            nodes.removeAll(a);
+        }
+        this.digraphs = digraphs;
+        graph.rebuildGraph();
+        for (Deque<Integer> cycle : findCyclePacking()) {
+            digraphs.add(new HashSet<>(cycle));
+        }
+        this.mixedStructs = digraphs;
+        return mixedStructs;
     }
 
     public int lowerDigraphBound() {

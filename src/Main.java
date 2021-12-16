@@ -4,6 +4,7 @@ import java.util.*;
 public class Main {
 
     public static int recursions;
+    public static Set<Set<Integer>> fullDigraphs;
 
     public static Set<Integer> dfvsBranch(DirectedGraph graph, int k, boolean isScc) {
 
@@ -49,37 +50,57 @@ public class Main {
                 }
             }
         }
-        /*
-        Packing stacking = new Packing(graph);
 
-        stacking.getDigraphs();
-        Set<Integer> safeDiGraphNodes = stacking.getSafeToDeleteDigraphNodes();
+        Packing packing = new Packing(graph);
+
+        packing.getDigraphs();
+        Set<Integer> safeDiGraphNodes = packing.getSafeToDeleteDigraphNodes();
         if (safeDiGraphNodes.size() > k) {
             return null;
         }
         k = k - safeDiGraphNodes.size();
         graph.removeAllNodes(safeDiGraphNodes);
 
-        if (stacking.findCyclePacking().size() > k) {
+        packing = new Packing(graph);
+        if (Math.max(packing.findCyclePacking().size(), packing.lowerDigraphBound()) > k) {
             return null;
         }
 
-         */
+        /*
+        Set<Integer> digraph = new HashSet<>();
+        if (!fullDigraphs.isEmpty()) {
+            digraph = fullDigraphs.stream().iterator().next();
+            fullDigraphs.remove(digraph);
+        }
+        */
 
         // find a Cycle
         Deque<Integer> cycle = graph.findBestCycle();
 
         if (cycle == null) {
-
             // The graph does not have any cycles
             // We will return the found cleanedNodes
             //cleanedNodes.addAll(safeDiGraphNodes);
             return cleanedNodes;
-
         }
 
 
         Map<Integer, List<Integer>> sortedCycle = new HashMap<>();
+        /*
+        Set<Integer> struct = new HashSet<>();
+        if (digraph != null) {
+            if (graph.hasAllNodes(digraph)) {
+                struct = digraph;
+            }
+            else {
+                struct.addAll(cycle);
+            }
+        }
+        else {
+            struct.addAll(cycle);
+        }
+
+         */
         for (Integer v : cycle) {
             graph.calculatePetal(v);
             if (!sortedCycle.containsKey(graph.getNode(v).getPedal())) {
@@ -127,7 +148,7 @@ public class Main {
 
     public static Set<Integer> dfvsSolve(DirectedGraph graph) {
         Packing packing = new Packing(graph);
-        packing.getDigraphs();
+        fullDigraphs = packing.getDigraphs();
         Set<Integer> newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
         graph.removeAllNodes(newDeletedNodes);
         Set<Integer> allDfvs = new HashSet<>(newDeletedNodes);
@@ -146,6 +167,19 @@ public class Main {
         graph.clearStack();
 
         for (DirectedGraph scc : SCCs) {
+            packing = new Packing(scc);
+            newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
+            graph.removeAllNodes(newDeletedNodes);
+            allDfvs.addAll(newDeletedNodes);
+            while (!newDeletedNodes.isEmpty()) {
+                packing = new Packing(scc);
+                packing.getDigraphs();
+                newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
+                graph.removeAllNodes(newDeletedNodes);
+                allDfvs.addAll(newDeletedNodes);
+            }
+
+
             allDfvs.addAll(scc.cleanGraph(Integer.MAX_VALUE));
             scc.clearStack();
 
@@ -179,14 +213,14 @@ public class Main {
     }
 
     public static void main(String[] args) {
-
+/*
         File file = new File("instances/complex");
 
         /*
         for (File inst : file.listFiles()) {
             developMain(inst.getPath());
         }
-        /*/
+
         developMain("instances/complex/chess-n_1000 "); // 60
         developMain("instances/complex/health-n_1000");// 232
         developMain("instances/complex/link-kv-n_300"); // 55
@@ -206,7 +240,8 @@ public class Main {
         developMain("instances/synthetic/synth-n_50-m_357-k_20-p_0.2.txt");//20
         developMain("instances/synthetic/synth-n_140-m_1181-k_20-p_0.1.txt"); //20
         developMain("instances/synthetic/synth-n_120-m_492-k_30-p_0.05.txt"); //21
-        /*
+
+        */
         DirectedGraph graph = new DirectedGraph(
                 args[0]);
         Set<Integer> solution = dfvsSolve(graph);
@@ -216,7 +251,7 @@ public class Main {
             }
         }
         System.out.println("#recursive steps: " + recursions);
-         */
+
     }
 }
 /*
