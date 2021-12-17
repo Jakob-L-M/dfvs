@@ -4,8 +4,8 @@ public class Packing {
     private final Set<Integer> usedNodes;
     private final List<Deque<Integer>> costlySubGraphs;
     private DirectedGraph graph;
-    private Set<Set<Integer>> digraphs;
-    private Set<Set<Integer>> mixedStructs;
+    public Set<Set<Integer>> digraphs;
+    private List<Set<Integer>> mixedStructs;
     private Set<Integer> safeToDeleteDigraphNodes;
 
     Packing(DirectedGraph graph) {
@@ -14,16 +14,24 @@ public class Packing {
         usedNodes = new HashSet<>();
         digraphs = new HashSet<>();
         safeToDeleteDigraphNodes = new HashSet<>();
+        mixedStructs = new ArrayList<Set<Integer>>();
     }
 
     public static void main(String[] args) {
         //DirectedGraph graph = new DirectedGraph("instances/synthetic/synth-n_140-m_1181-k_20-p_0.1.txt");
         DirectedGraph graph = new DirectedGraph("instances/complex/usairport-n_800");
         Packing packing = new Packing(graph);
-        System.out.println(packing.getDigraphs());
-        System.out.println(packing.getMixedStruct());
+        //System.out.println(packing.getDigraphs());
+
+        Set<Integer> safeDelete = packing.getSafeToDeleteDigraphNodes();
+        System.out.println(safeDelete);
+        graph.removeAllNodes(safeDelete);
+
+        packing.getMixedStruct();
         System.out.println(packing.mixedStructs.size());
-        System.out.println(packing.digraphs);
+        System.out.println(packing.mixedStructs);
+        System.out.println(packing.findCyclePacking().size());
+        System.out.println(packing.lowerDigraphBound());
         /*Set<Integer> safeDigraphDeletions = packing.getSafeToDeleteDigraphNodes();
         System.out.println(safeDigraphDeletions);
 
@@ -99,6 +107,8 @@ public class Packing {
 
         //System.out.println(stacking.findBigDigraphs().size());
     }
+
+    //public Set<Set<Integer>> getRealDigraphs
 
     public void safeDeletionDigraph() {
         Set<Integer> safeToDelete = new HashSet<>();
@@ -177,32 +187,34 @@ public class Packing {
         return digraphs;
     }
 
-    public Set<Set<Integer>> getMixedStruct() {
+    public List<Set<Integer>> getMixedStruct() {
         graph.addStackCheckpoint();
         Set<Set<Integer>> digraphs = new HashSet<>();
         Set<Integer> nodes = graph.nodeMap.keySet();
         while (!graph.nodeMap.isEmpty()) {
             Integer u = nodes.stream().iterator().next();
             Set<Integer> a = expand(u);
-            if (a.size() > 1) digraphs.add(a);
+            if (a.size() > 2) digraphs.add(a);
             for (Integer i : a) {
                 graph.removeNode(i);
             }
             nodes.removeAll(a);
         }
         this.digraphs = digraphs;
-        graph.rebuildGraph();
+        this.mixedStructs.addAll(digraphs);
+        this.mixedStructs.add(null);
         for (Deque<Integer> cycle : findCyclePacking()) {
             digraphs.add(new HashSet<>(cycle));
         }
-        this.mixedStructs = digraphs;
+        graph.rebuildGraph();
         return mixedStructs;
     }
 
+
     public int lowerDigraphBound() {
         int lowerBound = 0;
-        for (Set<Integer> digraph : digraphs) {
-            lowerBound += digraph.size() - 1;
+        for (Set<Integer> struct : digraphs) {
+            lowerBound += struct.size() - 1;
         }
         return lowerBound;
     }
@@ -303,6 +315,7 @@ public class Packing {
             }
         }
     }
+
 
 
     public Set<Set<Integer>> findQuickPacking() {

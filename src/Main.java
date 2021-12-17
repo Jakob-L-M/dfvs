@@ -24,7 +24,8 @@ public class Main {
         // Reduce the leftover budget by cleanedNodes.size()
         k = k - cleanedNodes.size();
 
-        if (k < 0) {
+        if (k < 0 && recursions % 50 == 0) {
+        //if (false) {
             graph.calculateAllPetals();
 
             int max_petal = -1;
@@ -52,44 +53,34 @@ public class Main {
         }
 
         Packing packing = new Packing(graph);
-/*
+        Set<Integer> safeDiGraphNodes = packing.getSafeToDeleteDigraphNodes();
+        /*
         packing.getDigraphs();
         Set<Integer> safeDiGraphNodes = packing.getSafeToDeleteDigraphNodes();
         if (safeDiGraphNodes.size() > k) {
             return null;
         }
         k = k - safeDiGraphNodes.size();
-        graph.removeAllNodes(safeDiGraphNodes);
-
-        packing = new Packing(graph);*/
-        if (/*Math.max(*/packing.findCyclePacking().size()/*, packing.lowerDigraphBound())*/ > k) {
+        graph.removeAllNodes(safeDiGraphNodes);*/
+        if (Math.max(packing.findCyclePacking().size(), packing.lowerDigraphBound()) > k) {
             return null;
         }
-
-        /*
-        Set<Integer> digraph = new HashSet<>();
-        if (!fullDigraphs.isEmpty()) {
-            digraph = fullDigraphs.stream().iterator().next();
-            fullDigraphs.remove(digraph);
-        }
-        */
 //Start Digraphunsinn
-        if (!fullDigraphs.isEmpty()) {
-            fullDigraphs = graph.cleanDigraphSet(fullDigraphs);
-        }
-        Set<Integer> digraph = new HashSet<>();
+        fullDigraphs = graph.cleanDigraphSet(fullDigraphs);
+        Set<Integer> digraph = null;
         if (!fullDigraphs.isEmpty()) {
             digraph = fullDigraphs.stream().iterator().next();
-            //System.out.println(digraph);
+        }
+        if (digraph != null && digraph.size() > 1) {
             for (Integer v : digraph) {
-                // delete a vertex of the circle and branch for here
+                // delete all vertices except one
                 graph.addStackCheckpoint();
                 Set<Integer> digraphWithoutV = new HashSet<>(digraph);
                 digraphWithoutV.remove(v);
-                graph.removeAllNodes(digraph);
+                graph.removeAllNodes(digraphWithoutV);
                 // increment recursions to keep track of tree size
                 recursions++;
-
+                //System.out.println(digraphWithoutV);
                 // branch with a maximum cost of k
                 // -1: Just deleted a node
                 // -cleanedNodes.size(): nodes that where removed during graph reduction
@@ -101,7 +92,7 @@ public class Main {
                         // Add the nodeId of the valid solution and all cleanedNodes
                         dfvs.addAll(digraphWithoutV);
                         dfvs.addAll(cleanedNodes);
-                        //dfvs.addAll(safeDiGraphNodes);
+                        dfvs.addAll(safeDiGraphNodes);
 
                         return dfvs;
                     } else {
@@ -109,14 +100,14 @@ public class Main {
                     }
                 }
             }
-        else { //Ende Digraphunsinn
+        else { //Ende Digraphunsinn*/
             // find a Cycle
             Deque<Integer> cycle = graph.findBestCycle();
 
             if (cycle == null) {
                 // The graph does not have any cycles
                 // We will return the found cleanedNodes
-                //cleanedNodes.addAll(safeDiGraphNodes);
+                cleanedNodes.addAll(safeDiGraphNodes);
                 return cleanedNodes;
             }
 
@@ -155,7 +146,7 @@ public class Main {
                         // Add the nodeId of the valid solution and all cleanedNodes
                         dfvs.add(v);
                         dfvs.addAll(cleanedNodes);
-                        //dfvs.addAll(safeDiGraphNodes);
+                        dfvs.addAll(safeDiGraphNodes);
 
                         return dfvs;
                     } else {
@@ -170,7 +161,7 @@ public class Main {
 
     public static Set<Integer> dfvsSolve(DirectedGraph graph) {
         Packing packing = new Packing(graph);
-        fullDigraphs = packing.getDigraphs();
+        packing.getDigraphs();
         Set<Integer> newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
         graph.removeAllNodes(newDeletedNodes);
         Set<Integer> allDfvs = new HashSet<>(newDeletedNodes);
@@ -207,8 +198,8 @@ public class Main {
 
             Packing sccPacking = new Packing(scc);
             int k = sccPacking.findCyclePacking().size();
-
-            fullDigraphs = packing.getDigraphs();
+            fullDigraphs = sccPacking.getDigraphs();
+            //System.out.println("Lower bound: " + k);
 
             Set<Integer> dfvs = null;
 
@@ -266,9 +257,9 @@ public class Main {
 
         developMain("instances/synthetic/synth-n_50-m_357-k_20-p_0.2.txt");//20
         developMain("instances/synthetic/synth-n_140-m_1181-k_20-p_0.1.txt"); //20
-        developMain("instances/synthetic/synth-n_120-m_492-k_30-p_0.05.txt"); //21
-
-        */
+        //developMain("instances/synthetic/synth-n_120-m_492-k_30-p_0.05.txt"); //21
+/*
+*/
         DirectedGraph graph = new DirectedGraph(
                 args[0]);
         Set<Integer> solution = dfvsSolve(graph);
