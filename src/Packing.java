@@ -1,118 +1,21 @@
 import java.util.*;
 
 public class Packing {
-    private final Set<Integer> usedNodes;
-    private final List<Deque<Integer>> costlySubGraphs;
-    private DirectedGraph graph;
-    public Set<Set<Integer>> digraphs;
-    private List<Set<Integer>> mixedStructs;
-    private Set<Integer> safeToDeleteDigraphNodes;
+    private final DirectedGraph graph;
+    private final List<List<Integer>> mixedStructs;
+    private final Set<Integer> safeToDeleteDigraphNodes;
+    public Set<List<Integer>> digraphs;
 
     Packing(DirectedGraph graph) {
         this.graph = graph;
-        costlySubGraphs = new ArrayList<>();
-        usedNodes = new HashSet<>();
         digraphs = new HashSet<>();
         safeToDeleteDigraphNodes = new HashSet<>();
-        mixedStructs = new ArrayList<Set<Integer>>();
+        mixedStructs = new ArrayList<>();
     }
-
-    public static void main(String[] args) {
-        //DirectedGraph graph = new DirectedGraph("instances/synthetic/synth-n_140-m_1181-k_20-p_0.1.txt");
-        DirectedGraph graph = new DirectedGraph("instances/complex/usairport-n_800");
-        Packing packing = new Packing(graph);
-        //System.out.println(packing.getDigraphs());
-
-        Set<Integer> safeDelete = packing.getSafeToDeleteDigraphNodes();
-        System.out.println(safeDelete);
-        graph.removeAllNodes(safeDelete);
-
-        packing.getMixedStruct();
-        System.out.println(packing.mixedStructs.size());
-        System.out.println(packing.mixedStructs);
-        System.out.println(packing.findCyclePacking().size());
-        System.out.println(packing.lowerDigraphBound());
-        /*Set<Integer> safeDigraphDeletions = packing.getSafeToDeleteDigraphNodes();
-        System.out.println(safeDigraphDeletions);
-
-        packing.graph = new DirectedGraph(packing.graph);
-        long time = -System.nanoTime();
-        System.out.println(packing.findQuickPacking());
-        time += System.nanoTime();
-        System.out.println(time);
-
-        packing.graph = new DirectedGraph(packing.graph);
-        time = -System.nanoTime();
-        packing.findCyclePacking();
-        System.out.println(packing.costlySubGraphs);
-        time += System.nanoTime();
-        System.out.println(time);
-
-        packing.graph = new DirectedGraph(packing.graph);
-        time = -System.nanoTime();
-        System.out.println(packing.findQuickPacking());
-        time += System.nanoTime();
-        System.out.println(time);
-
-        packing.graph = new DirectedGraph(packing.graph);
-        //System.out.println(packing.getDigraphs());
-        packing.safeDeletionDigraph();
-        System.out.println(safeDigraphDeletions);
-
-
-
-*/
-
-        /*File complexInstances = new File("instances/complex");
-        long time = -System.nanoTime();
-        for (File file : complexInstances.listFiles()) {
-            DirectedGraph graph = new DirectedGraph(file.getPath());
-            Packing packing = new Packing(graph);
-            //Set<Set<Integer>> digraphs = stacking.getDigraphs();
-            System.out.println(packing.findQuickPacking());
-            for (Set<Integer> cycle : packing.findQuickPacking()) {
-                if (cycle.size() > 2) System.out.println("gut: " + cycle);
-            }
-        }
-        time += System.nanoTime();
-        System.out.println(time);
-        //System.out.println(stacking.getSafeToDeleteDigraphNodes().size());
-        //System.out.println(digraphs);
-        PriorityQueue<Set<Integer>> digraphQueue = new PriorityQueue<>(200, new Main.SetComparator());
-        int lowerBound = 0;
-        for (Set<Integer> digraph : digraphs) {
-            lowerBound += digraph.size() - 1;
-            for (Integer i : digraph) {
-                for (Integer j : digraph) {
-                    if (i != j && !graph.hasEdge(i, j)) System.out.println("test");
-                }
-            }
-            digraphQueue.add(digraph);
-            System.out.println(digraph);
-            System.out.println(stacking.getSafeToDeleteDigraphNodes());
-            System.out.println(stacking.getSafeToDeleteDigraphNodes().size());
-        }
-        graph = new DirectedGraph(stacking.graphFixed);
-        Set<Integer> safeToDelete = new HashSet<>();
-        while(!digraphQueue.isEmpty()) {
-            Set<Integer> digraph = digraphQueue.poll();
-            int n = digraph.size();
-            for (Integer i : digraph){
-                if(graph.getNode(i).getInDegree() == n - 1 || graph.getNode(i).getOutDegree() == n - 1) {
-                    safeToDelete.add(i);
-                }
-            }
-        }
-        System.out.println(safeToDelete.size());*/
-
-        //System.out.println(stacking.findBigDigraphs().size());
-    }
-
-    //public Set<Set<Integer>> getRealDigraphs
 
     public void safeDeletionDigraph() {
         Set<Integer> safeToDelete = new HashSet<>();
-        for (Set<Integer> digraph : digraphs) {
+        for (List<Integer> digraph : digraphs) {
             int n = digraph.size();
             Set<Integer> deletionCandidates = new HashSet<>();
             for (Integer i : digraph) {
@@ -134,6 +37,7 @@ public class Packing {
 
     public List<Deque<Integer>> findCyclePacking() {
         graph.addStackCheckpoint();
+        List<Deque<Integer>> costlySubGraphs = new ArrayList<>();
         Deque<Integer> cycle = graph.findBestCycle();
         while (cycle != null && !cycle.isEmpty()) {
             costlySubGraphs.add(cycle);
@@ -146,13 +50,13 @@ public class Packing {
         return costlySubGraphs;
     }
 
-    public Set<Set<Integer>> getDigraphs() {
+    public Set<List<Integer>> getDigraphs() {
         graph.addStackCheckpoint();
-        Set<Set<Integer>> digraphs = new HashSet<>();
+        Set<List<Integer>> digraphs = new HashSet<>();
         Set<Integer> nodes = graph.nodeMap.keySet();
         while (!graph.nodeMap.isEmpty()) {
             Integer u = nodes.stream().iterator().next();
-            Set<Integer> a = expand(u);
+            List<Integer> a = expand(u);
             boolean fullDigraphDeletable = false;
             /*
             for (Integer node : nodes) {
@@ -187,13 +91,13 @@ public class Packing {
         return digraphs;
     }
 
-    public List<Set<Integer>> getMixedStruct() {
+    public List<List<Integer>> getMixedStruct() {
         graph.addStackCheckpoint();
-        Set<Set<Integer>> digraphs = new HashSet<>();
+        Set<List<Integer>> digraphs = new HashSet<>();
         Set<Integer> nodes = graph.nodeMap.keySet();
         while (!graph.nodeMap.isEmpty()) {
             Integer u = nodes.stream().iterator().next();
-            Set<Integer> a = expand(u);
+            List<Integer> a = expand(u);
             if (a.size() > 2) digraphs.add(a);
             for (Integer i : a) {
                 graph.removeNode(i);
@@ -204,7 +108,7 @@ public class Packing {
         this.mixedStructs.addAll(digraphs);
         this.mixedStructs.add(null);
         for (Deque<Integer> cycle : findCyclePacking()) {
-            digraphs.add(new HashSet<>(cycle));
+            digraphs.add(new ArrayList<>(cycle));
         }
         graph.rebuildGraph();
         return mixedStructs;
@@ -213,22 +117,20 @@ public class Packing {
 
     public int lowerDigraphBound() {
         int lowerBound = 0;
-        for (Set<Integer> struct : digraphs) {
+        for (List<Integer> struct : digraphs) {
             lowerBound += struct.size() - 1;
         }
         return lowerBound;
     }
 
 
-    private Set<Integer> expand(Integer start) {
-        Set<Integer> digraph = new HashSet<>();
+    private List<Integer> expand(Integer start) {
+        List<Integer> digraph = new ArrayList<>();
         digraph.add(start);
         boolean change = true;
-        Set<Integer> commonNeighbours = new HashSet<>();
-        commonNeighbours.addAll(graph.nodeMap.keySet());
+        Set<Integer> commonNeighbours = new HashSet<>(graph.nodeMap.get(start).getInNodes());
         while (change) {
-            commonNeighbours.addAll(graph.nodeMap.keySet());
-            change = true;
+            commonNeighbours.addAll(graph.getNode(digraph.get(0)).getInNodes());
             for (Integer u : digraph) {
                 commonNeighbours.retainAll(graph.getNode(u).getInNodes());
                 commonNeighbours.retainAll(graph.getNode(u).getOutNodes());
@@ -238,7 +140,7 @@ public class Packing {
                 }
             }
             if (!commonNeighbours.isEmpty()) {
-                digraph.add(commonNeighbours.stream().iterator().next());
+                digraph.add(commonNeighbours.iterator().next());
             }
         }
         //Set<Integer> commonNeighbours = new HashSet<>();
@@ -251,71 +153,6 @@ public class Packing {
 
 
 //________________________________________________Ab hier Baustelle
-
-
-    public void findFull3Digraphs() {
-        Set<Integer> nodes = new HashSet<>();
-        nodes.addAll(graph.nodeMap.keySet());
-        for (Integer u : graph.nodeMap.keySet()) {
-            if (graph.getNode(u).isTwoCycle() != -1) {
-                Integer v = graph.getNode(u).isTwoCycle();
-            }
-        }
-        Set<Integer> visited = new HashSet<>();
-        HashMap<Integer, Integer> parent = new HashMap<>();
-        Deque<Integer> cycle = new ArrayDeque<>();
-        for (Integer i : graph.nodeMap.keySet()) {
-            parent.put(i, -1);
-        }
-        for (Integer start : graph.nodeMap.keySet()) {
-            if (visited.contains(start)) continue;
-            Deque<Integer> queue = new ArrayDeque<>();
-            Deque<Integer> tempCycle = new ArrayDeque<>();
-            queue.add(start);
-            visited.add(start);
-            while (!queue.isEmpty()) {
-                Integer u = queue.pop();
-                for (Integer v : graph.nodeMap.get(u).getOutNodes()) {
-                    if (!visited.contains(v)) {
-                        parent.put(v, u);
-                        visited.add(v);
-                        queue.add(v);
-                    }
-                    if (v.equals(start)) {
-
-                        int w = u;
-                        while (w != -1) {
-                            tempCycle.add(w);
-                            w = parent.get(w);
-                        }
-                    }
-                    if (!tempCycle.isEmpty()) break;
-                }
-                if (!tempCycle.isEmpty()) break;
-            }
-            Deque<Integer> nodesLeft = new ArrayDeque<>();
-            if (!cycle.isEmpty()) {
-                for (Integer u : tempCycle) {
-                    if (!graph.nodeMap.get(u).isFixed()) nodesLeft.add(u);
-                }
-            } else {
-                nodesLeft = tempCycle;
-            }
-            if (tempCycle.size() == 3) {
-                Iterator<Integer> it = tempCycle.iterator();
-                int u = it.next();
-                int v = it.next();
-                int w = it.next();
-                if (graph.hasEdge(u, v) && graph.hasEdge(v, w) && graph.hasEdge(w, u)
-                        && graph.hasEdge(v, u) && graph.hasEdge(w, v) && graph.hasEdge(u, w)) {
-                    usedNodes.add(u);
-                    usedNodes.add(v);
-                    usedNodes.add(w);
-                }
-            }
-        }
-    }
-
 
 
     public Set<Set<Integer>> findQuickPacking() {

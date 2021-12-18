@@ -1,5 +1,4 @@
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 public class DirectedNode {
     private final Integer nodeID;
@@ -12,13 +11,6 @@ public class DirectedNode {
         this.nodeID = nodeID;
         this.fixed = false;
         this.pedal = 0;
-    }
-
-    public DirectedNode(DirectedNode that) {
-        this.nodeID = that.getNodeID();
-        this.fixed = false;
-        this.inNodes.addAll(that.getInNodes());
-        this.outNodes.addAll(that.getOutNodes());
     }
 
     public boolean addInNode(Integer pre) {
@@ -40,6 +32,8 @@ public class DirectedNode {
     public void fixNode() {
         this.fixed = true;
     }
+
+    public void unfixNode() { this.fixed = false;}
 
     public boolean isFixed() {
         return fixed;

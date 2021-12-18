@@ -69,10 +69,9 @@ public class Tarjan {
 
     public Set<DirectedGraph> getSCCGraphs() {
         Set<DirectedGraph> sccGraphSet = new HashSet<>();
-        BiMap<String, Integer> inverseDict = this.graph.dict;
         Map<Integer, ArrayList<Integer>> scc = getSCCs();
         for (int i : scc.keySet()) {
-            DirectedGraph addGraph = new DirectedGraph(inverseDict);
+            DirectedGraph addGraph = new DirectedGraph();
             for (Integer n : scc.get(i)) {
                 addGraph.addNode(n);
             }

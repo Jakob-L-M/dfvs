@@ -6,9 +6,7 @@ public class StackTuple {
     boolean added; //true if added false if removed
 
     // Node-only fields
-    int nodeId;
-    Set<Integer> outNodes;
-    Set<Integer> inNodes;
+    DirectedNode node;
 
     // Edge-only fields
     int from;
@@ -17,9 +15,7 @@ public class StackTuple {
     public StackTuple(boolean added, DirectedNode node) {
         this.added = added;
         this.type = GraphType.NODE;
-        this.nodeId = node.getNodeID();
-        this.outNodes = node.getOutNodes();
-        this.inNodes = node.getInNodes();
+        this.node = node;
     }
 
     public StackTuple(boolean added, int from, int to) {
@@ -33,8 +29,6 @@ public class StackTuple {
     public String toString() {
         return "{" +
                 "type=" + type +
-                ", nodeId=" + nodeId +
-                ", outNodes=" + outNodes +
                 ", from=" + from +
                 ", to=" + to +
                 "}\n";
