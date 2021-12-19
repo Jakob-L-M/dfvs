@@ -1,3 +1,7 @@
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.*;
 
 public class Main {
@@ -25,7 +29,7 @@ public class Main {
         }
 
         Packing packing = null;
-        if (graph.k < 0) { // 3 && graph.k <= Math.sqrt(graph.nodeMap.size()) - 1) {
+        if (graph.k > 4) { // 3 && graph.k <= Math.sqrt(graph.nodeMap.size()) - 1) {
             int maxPetal = -1;
             int maxPetalId = -1;
             Set<Integer> petalSet = null;
@@ -48,12 +52,13 @@ public class Main {
                 packing = new Packing(graph);
                 int tempK = graph.k;
                 graph.k = 1000000;
-                Set<Integer> preClean = graph.cleanGraph();
-                graph.k = tempK - preClean.size();
+                graph.cleanGraph();
+                //graph.k = tempK - preClean.size();
                 //if (!preClean.isEmpty()) System.out.println("hier clean: " + preClean.size());
-                if (graph.k - preClean.size() - packing.findCyclePacking().size() + graph.solution.size() < maxPetal) {
+                if (tempK - packing.findCyclePacking().size() + graph.solution.size() < maxPetal) {
 
                     graph.rebuildGraph();
+                    graph.k = tempK;
                     graph.removeNode(maxPetalId);
                     cleanedNodes.add(maxPetalId);
                     graph.k--;
@@ -66,10 +71,10 @@ public class Main {
                         return null;
                     }
                     cleanedNodes.addAll(newDeletedNodes);
-                    cleanedNodes.addAll(preClean);
 
                 } else {
                     graph.rebuildGraph();
+                    graph.k = tempK;
                 }
             }
         }
@@ -132,10 +137,6 @@ public class Main {
                 // -cleanedNodes.size(): nodes that where removed during graph reduction
                 int kPrev = graph.k;
                 graph.k = graph.k - digraphWithoutV.size();
-                Set<Integer> cleanAgain = graph.cleanGraph();
-                cleanedNodes.addAll(cleanAgain);
-                graph.k -= cleanAgain.size();
-                if (graph.k < 0) return null;
                 Set<Integer> dfvs = dfvsBranch(graph);
 
                 // if there is a valid solution in the recursion it will be returned
@@ -265,14 +266,14 @@ public class Main {
         int opt_sol = solSizes.get(file.substring(file.lastIndexOf('/') + 1));
         DirectedGraph graph = new DirectedGraph(file);
         graph.clearStack();
-        System.out.println("Solving: " + file);
+        System.out.print(file.substring(file.lastIndexOf('/') + 1));
         long time = -System.nanoTime();
         int k = dfvsSolve(graph).size();
         if (k != opt_sol) {
-            System.out.println("ERROR!\tcorrect solution: " + opt_sol);
+            System.err.println("\nERROR!\tcorrect solution: " + opt_sol + "\n");
         }
-        System.out.println("\tk: " + k);
-        System.out.println("\t#recursive steps: " + recursions);
+        System.out.print("\tk: " + k);
+        System.out.print("\t#recursive steps: " + recursions);
         //System.out.println("\t#petal calcs: " + petal + " - " + petal_suc);
         //System.out.println("\t\ttime: " + utils.round(petal_time / 1_000_000_000.0, 4));
         //System.out.println("\t#digraph calcs: " + digraph + " - " + digraph_suc);
@@ -299,9 +300,26 @@ public class Main {
 
     public static void main(String[] args) {
 
+        /*
         solSizes = utils.loadSolSizes();
-/*
+
         long total_time = -System.nanoTime();
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("instances/run_me.txt"));
+            String line = br.readLine();
+            boolean solve = true;
+            while (line != null) {
+                if (line.equals("instances/complex/chess-n_100")) {
+                    solve = true;
+                }
+                if(solve)developMain(line);
+                line = br.readLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        /*
         developMain("instances/complex/chess-n_1000"); // 60
         developMain("instances/complex/health-n_1000");// 232
         developMain("instances/complex/link-kv-n_300"); // 55
@@ -317,11 +335,9 @@ public class Main {
         developMain("instances/synthetic/synth-n_90-m_327-k_30-p_0.05.txt"); // 14
 
         // Falsch gelöste Instanzen
-        */
-        developMain("instances/synthetic/synth-n_200-m_1115-k_15-p_0.05.txt"); //15
-        developMain("instances/synthetic/synth-n_300-m_2561-k_30-p_0.05.txt");
-        developMain("instances/synthetic/synth-n_275-m_2220-k_30-p_0.05.txt");
-/*
+        developMain("instances/synthetic/synth-n_200-m_1115-k_15-p_0.05.txt"); // 15
+        developMain("instances/synthetic/synth-n_300-m_2561-k_30-p_0.05.txt"); // 30
+        developMain("instances/synthetic/synth-n_275-m_2220-k_30-p_0.05.txt"); // 30
 
         developMain("instances/synthetic/synth-n_160-m_683-k_8-p_0.05.txt"); //6
 
@@ -330,12 +346,14 @@ public class Main {
 
         //developMain("instances/synthetic/synth-n_120-m_492-k_30-p_0.05.txt"); //21
         developMain("instances/synthetic/synth-n_80-m_444-k_25-p_0.1.txt"); //20
+        developMain("instances/complex/usairport-n_700");
 
 
         //developMain("instances/synthetic/synth-n_70-m_342-k_30-p_0.1.txt"); //19
 
+         */
+
         //System.out.println("\nTotal time: " + utils.round((total_time + System.nanoTime()) / 1_000_000_000.0, 4) + "sec");
-*/
         productionMain(args[0]);
     }
 }
