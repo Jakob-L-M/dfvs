@@ -1,3 +1,4 @@
+import java.io.File;
 import java.util.*;
 
 public class Packing {
@@ -5,12 +6,39 @@ public class Packing {
     private final List<List<Integer>> mixedStructs;
     private final Set<Integer> safeToDeleteDigraphNodes;
     public Set<List<Integer>> digraphs;
+    public List<Deque<Integer>> costlySubGraphs;
+    public Set<Integer> usedNodes;
 
     Packing(DirectedGraph graph) {
         this.graph = graph;
         digraphs = new HashSet<>();
         safeToDeleteDigraphNodes = new HashSet<>();
         mixedStructs = new ArrayList<>();
+        costlySubGraphs = new LinkedList<>();
+        usedNodes = new HashSet<>();
+    }
+
+    public static void main(String[] args) {
+        /*Packing packing = new Packing(new DirectedGraph("instances/complex/usairport-n_800"));
+        List<Deque<Integer>> pack = packing.findCyclePacking();
+        System.out.println(pack);
+        System.out.println(pack.size());
+        packing.swapOne(pack);
+        for (int i = 0; i < pack.size(); i++) {
+            packing.costlySubGraphs.remove(0);
+        }
+        System.out.println(packing.costlySubGraphs);
+        System.out.println(packing.costlySubGraphs.size());
+        int newSize = packing.costlySubGraphs.size();
+        packing.swapOne(packing.costlySubGraphs);
+        System.out.println(packing.costlySubGraphs);
+        System.out.println(packing.costlySubGraphs.size());
+         */
+        File complexInst = new File("instances/complex");
+        for (File inst : complexInst.listFiles()) {
+            Packing packing = new Packing(new DirectedGraph(inst.getPath()));
+            System.out.println(packing.getFourCycles());
+        }
     }
 
     public void safeDeletionDigraph() {
@@ -184,6 +212,73 @@ public class Packing {
         }
         return packing;
     }
+    //get all fourCycles
+    Set<Set<Integer>> getFourCycles() {
+        graph.addStackCheckpoint();
+        Set<Set<Integer>> fourCycles = new HashSet<>();
+        Deque<Integer> c4Deque = graph.findC4s();
+        if (c4Deque == null) return fourCycles;
+        Set<Integer> fourCycle = new HashSet<>(c4Deque);
+
+        while (fourCycle != null) {
+            fourCycles.add(fourCycle);
+            graph.removeAllNodes(fourCycle);
+            c4Deque = graph.findC4s();
+            if (c4Deque == null) return fourCycles;
+            fourCycle = new HashSet<>(c4Deque);
+        }
+        graph.rebuildGraph();
+        return fourCycles;
+    }
 
 
+
+
+
+    // Levs Code
+    public void swapOne(List<Deque<Integer>> pack) {
+        //Find nodes not included in packing.
+    	/*Set<Integer> freeNodes = new HashSet<Integer>();
+    	for (Integer node: graph.nodeMap.keySet()) {
+    		if (!usedNodes.contains(node)) freeNodes.add(node);
+    	}*/
+        //For each cycle, try removing it and find more than one cycle.
+        ArrayList<Deque<Integer>> oldCycs =  new ArrayList(pack);
+        for (Deque<Integer> cycle: oldCycs) {
+            //System.out.println("A " + costlySubGraphs.size());
+            costlySubGraphs.remove(cycle);
+            //System.out.println("B " + costlySubGraphs.size());
+            addCyclesWithout(cycle);
+            //System.out.println("C " + costlySubGraphs.size());
+        }
+    }
+
+    private void addCyclesWithout(Deque<Integer> removeCycle) {
+        graph.addStackCheckpoint();
+        Set<Integer> nodes = new HashSet<>(graph.nodeMap.keySet());
+        for (Integer node: nodes) {
+            if (usedNodes.contains(node) && !removeCycle.contains(node)) {
+                graph.removeNode(node);
+            }
+        }
+        usedNodes.removeAll(removeCycle);
+        Deque<Integer> cycle = graph.findBestCycle();
+        while (cycle != null && !cycle.isEmpty()) {
+            costlySubGraphs.add(cycle);
+            for (Integer i : cycle) {
+                graph.removeNode(i);
+                usedNodes.addAll(cycle);
+            }
+            cycle = graph.findBestCycle();
+        }
+        graph.rebuildGraph();
+    }
+
+    public int getCycleNumber(){
+        return costlySubGraphs.size();
+    }
+
+    public List<Deque<Integer>> getCycles(){
+        return costlySubGraphs;
+    }
 }

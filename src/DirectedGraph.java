@@ -497,10 +497,73 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return cycle;
     }
 
+
+    public Deque<Integer> findC4s() {
+        Set<Integer> visited = new HashSet<>();
+        Map<Integer, Integer> parent = new HashMap<>();
+        Deque<Integer> cycle = new ArrayDeque<>();
+        for (Integer i : nodeMap.keySet()) {
+            parent.put(i, -1);
+        }
+        for (Integer start : nodeMap.keySet()) {
+            if (visited.contains(start)) continue;
+            Deque<Integer> queue = new ArrayDeque<>();
+            Deque<Integer> tempCycle = new ArrayDeque<>();
+            queue.add(start);
+            queue.add(-1);
+            int depth = 1;
+            visited.add(start);
+            while (!queue.isEmpty()) {
+                Integer u = queue.pop();
+                System.out.println(depth);
+                if (u == -1) {
+                    depth++;
+                    queue.add(-1);
+                    if (depth > 4) break;
+                    continue;
+                }
+                for (Integer v : nodeMap.get(u).getOutNodes()) {
+                    if (!visited.contains(v)) {
+                        parent.put(v, u);
+                        visited.add(v);
+                        queue.add(v);
+                    }
+                    if (v.equals(start) && depth == 4) {
+                        int w = u;
+                        while (w != -1) {
+                            tempCycle.add(w);
+                            w = parent.get(w);
+                        }
+                    }
+                    //if (!tempCycle.isEmpty()) break;
+                }
+                //if (!tempCycle.isEmpty()) break;
+            }
+            visited = new HashSet<>();
+            System.out.println(tempCycle);
+            if (tempCycle.size() == 4) {
+                return tempCycle;
+            }
+        }
+        if (cycle.isEmpty()) return null;
+        return cycle;
+    }
+
+
+
+
+
     public void unfixAll() {
         for (DirectedNode node : nodeMap.values()) {
             node.unfixNode();
         }
+    }
+    public Set<Integer> getForbiddenNodes() {
+        Set<Integer> forbidden = new HashSet<>();
+        for (DirectedNode node : nodeMap.values()) {
+            if (node.isFixed()) forbidden.add(node.getNodeID());
+        }
+        return forbidden;
     }
 
     public void revertSolution(int v) {

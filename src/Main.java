@@ -25,20 +25,14 @@ public class Main {
         }
 
         Packing packing = null;
-        if (graph.k > 3 && graph.k <= Math.sqrt(graph.nodeMap.size()) - 1) {
-            petal++;
-            long time = -System.nanoTime();
-            int k_before = graph.k;
-
+        if (graph.k < 0) { // 3 && graph.k <= Math.sqrt(graph.nodeMap.size()) - 1) {
             int maxPetal = -1;
             int maxPetalId = -1;
             Set<Integer> petalSet = null;
             for (Integer nodeId : new HashSet<>(graph.nodeMap.keySet())) {
-
-                // all petals will be grater than 0 after the cleaning cycle.
+                // all petals will be greater than 0 after the cleaning cycle.
                 if (graph.nodeMap.get(nodeId).getPedal() > maxPetal) {
                     Tuple currentFlower = graph.calculatePetal(nodeId);
-
                     // if the found petal is still larger we will update the maximum flower
                     if (currentFlower.getValue() > maxPetal) {
                         maxPetalId = nodeId;
@@ -78,10 +72,6 @@ public class Main {
                     graph.rebuildGraph();
                 }
             }
-            if (k_before > graph.k) {
-                petal_suc++;
-            }
-            petal_time += (time + System.nanoTime());
         }
 
         if (graph.k < 0) {
@@ -89,15 +79,12 @@ public class Main {
         }
 
         if (graph.k > 4 && recursions % 5 == 0) {
-            digraph++;
             long time = -System.nanoTime();
-            int k_before = graph.k;
 
             packing = new Packing(graph);
             packing.getDigraphs();
             Set<Integer> safeDiGraphNodes = packing.getSafeToDeleteDigraphNodes();
             if (safeDiGraphNodes.size() > graph.k) {
-                digraph_time += (time + System.nanoTime());
                 return null;
             }
             if (!safeDiGraphNodes.isEmpty()) {
@@ -106,18 +93,14 @@ public class Main {
                 cleanedNodes.addAll(safeDiGraphNodes);
 
                 Set<Integer> newDeletedNodes = graph.cleanGraph();
-                if (newDeletedNodes == null) {
+                if (newDeletedNodes == null || graph.k < 0) {
                     return null;
                 }
                 cleanedNodes.addAll(newDeletedNodes);
-                if (k_before > graph.k) {
-                    digraph_suc++;
-                }
 
                 cleanedNodes.addAll(graph.solution);
                 graph.solution.clear();
             }
-            digraph_time += (time + System.nanoTime());
         }
 
         if (graph.k < 0) {
@@ -131,10 +114,10 @@ public class Main {
             return null;
         }
 
-        fullDigraphs = graph.cleanDigraphSet(fullDigraphs);
+        Set<List<Integer>> remainingDigraphs = graph.cleanDigraphSet(fullDigraphs);
         List<Integer> digraph = null;
-        if (!fullDigraphs.isEmpty()) {
-            digraph = fullDigraphs.iterator().next();
+        if (!remainingDigraphs.isEmpty()) {
+            digraph = remainingDigraphs.iterator().next();
         }
         if (digraph != null && digraph.size() > 1) {
             for (Integer v : digraph) {
@@ -149,6 +132,10 @@ public class Main {
                 // -cleanedNodes.size(): nodes that where removed during graph reduction
                 int kPrev = graph.k;
                 graph.k = graph.k - digraphWithoutV.size();
+                Set<Integer> cleanAgain = graph.cleanGraph();
+                cleanedNodes.addAll(cleanAgain);
+                graph.k -= cleanAgain.size();
+                if (graph.k < 0) return null;
                 Set<Integer> dfvs = dfvsBranch(graph);
 
                 // if there is a valid solution in the recursion it will be returned
@@ -311,9 +298,9 @@ public class Main {
     }
 
     public static void main(String[] args) {
-/*
-        solSizes = utils.loadSolSizes();
 
+        solSizes = utils.loadSolSizes();
+/*
         long total_time = -System.nanoTime();
         developMain("instances/complex/chess-n_1000"); // 60
         developMain("instances/complex/health-n_1000");// 232
@@ -329,6 +316,12 @@ public class Main {
         developMain("instances/synthetic/synth-n_100-m_1235-k_20-p_0.2.txt"); // 20
         developMain("instances/synthetic/synth-n_90-m_327-k_30-p_0.05.txt"); // 14
 
+        // Falsch gelöste Instanzen
+        */
+        developMain("instances/synthetic/synth-n_200-m_1115-k_15-p_0.05.txt"); //15
+        developMain("instances/synthetic/synth-n_300-m_2561-k_30-p_0.05.txt");
+        developMain("instances/synthetic/synth-n_275-m_2220-k_30-p_0.05.txt");
+/*
 
         developMain("instances/synthetic/synth-n_160-m_683-k_8-p_0.05.txt"); //6
 
