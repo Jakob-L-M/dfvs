@@ -52,7 +52,12 @@ public class Main {
                 graph.addStackCheckpoint();
                 graph.removeAllNodes(petalSet);
                 packing = new Packing(graph);
-                if (graph.k - packing.findCyclePacking().size() + graph.solution.size() < maxPetal) {
+                int tempK = graph.k;
+                graph.k = 1000000;
+                Set<Integer> preClean = graph.cleanGraph();
+                graph.k = tempK - preClean.size();
+                //if (!preClean.isEmpty()) System.out.println("hier clean: " + preClean.size());
+                if (graph.k - preClean.size() - packing.findCyclePacking().size() + graph.solution.size() < maxPetal) {
 
                     graph.rebuildGraph();
                     graph.removeNode(maxPetalId);
@@ -67,6 +72,7 @@ public class Main {
                         return null;
                     }
                     cleanedNodes.addAll(newDeletedNodes);
+                    cleanedNodes.addAll(preClean);
 
                 } else {
                     graph.rebuildGraph();
@@ -280,10 +286,10 @@ public class Main {
         }
         System.out.println("\tk: " + k);
         System.out.println("\t#recursive steps: " + recursions);
-        System.out.println("\t#petal calcs: " + petal + " - " + petal_suc);
-        System.out.println("\t\ttime: " + utils.round(petal_time / 1_000_000_000.0, 4));
-        System.out.println("\t#digraph calcs: " + digraph + " - " + digraph_suc);
-        System.out.println("\t\ttime: " + utils.round(digraph_time / 1_000_000_000.0, 4));
+        //System.out.println("\t#petal calcs: " + petal + " - " + petal_suc);
+        //System.out.println("\t\ttime: " + utils.round(petal_time / 1_000_000_000.0, 4));
+        //System.out.println("\t#digraph calcs: " + digraph + " - " + digraph_suc);
+        //System.out.println("\t\ttime: " + utils.round(digraph_time / 1_000_000_000.0, 4));
         double sec = utils.round((time + System.nanoTime()) / 1_000_000_000.0, 4);
         System.out.println("\ttime: " + sec);
         recursions = 0;
@@ -305,12 +311,12 @@ public class Main {
     }
 
     public static void main(String[] args) {
-
+/*
         solSizes = utils.loadSolSizes();
 
         long total_time = -System.nanoTime();
         developMain("instances/complex/chess-n_1000"); // 60
-        //developMain("instances/complex/health-n_1000");// 232
+        developMain("instances/complex/health-n_1000");// 232
         developMain("instances/complex/link-kv-n_300"); // 55
         developMain("instances/complex/biology-n_25-m_231-p_0.9-6"); // 8
         developMain("instances/complex/biology-n_30-m_287-p_0.5-5"); // 15
@@ -328,13 +334,16 @@ public class Main {
 
         developMain("instances/synthetic/synth-n_50-m_357-k_20-p_0.2.txt");//20
         developMain("instances/synthetic/synth-n_140-m_1181-k_20-p_0.1.txt"); //20
+
         //developMain("instances/synthetic/synth-n_120-m_492-k_30-p_0.05.txt"); //21
         developMain("instances/synthetic/synth-n_80-m_444-k_25-p_0.1.txt"); //20
+
+
         //developMain("instances/synthetic/synth-n_70-m_342-k_30-p_0.1.txt"); //19
 
-        System.out.println("\nTotal time: " + utils.round((total_time + System.nanoTime()) / 1_000_000_000.0, 4) + "sec");
-
-        //productionMain(args[0]);
+        //System.out.println("\nTotal time: " + utils.round((total_time + System.nanoTime()) / 1_000_000_000.0, 4) + "sec");
+*/
+        productionMain(args[0]);
     }
 }
 /*
