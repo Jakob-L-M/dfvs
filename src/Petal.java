@@ -63,7 +63,6 @@ public class Petal {
         Queue<Integer> queue = new LinkedList<>();
 
         queue.add(-1);
-        visited.add(-1);
 
         // Standard BFS Loop
         while (!queue.isEmpty()) {

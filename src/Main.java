@@ -1,81 +1,173 @@
-import java.io.File;
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.*;
 
 public class Main {
 
     public static int recursions;
+    public static int petal;
+    public static long petal_time;
+    public static int petal_suc;
+    public static int digraph;
+    public static long digraph_time;
+    public static int digraph_suc;
+    public static Set<List<Integer>> fullDigraphs;
+    public static Map<String, Integer> solSizes;
 
-    public static Set<Integer> dfvsBranch(DirectedGraph graph, int k, boolean isScc) {
+    public static Set<Integer> dfvsBranch(DirectedGraph graph) {
 
-        // clean the graph and save all selfCycle-Nodes that have been removed during cleaning
-        Set<Integer> cleanedNodes;
-        if (!isScc) {
-            cleanedNodes = graph.cleanGraph(k);//new HashSet<>();
-        } else {
-            cleanedNodes = new HashSet<>();
-        }
+        // increment recursions to keep track of tree size
+        recursions++;
 
-        // If there should be more cleanedNodes than k, we can break here.
-        if (cleanedNodes.size() > k) {
+        // clean the graph if the budget limit is reached we can break here
+        Set<Integer> cleanedNodes = graph.cleanGraph();
+
+        if (cleanedNodes == null) {
             return null;
         }
 
-        // Reduce the leftover budget by cleanedNodes.size()
-        k = k - cleanedNodes.size();
-
-        if (k < 0) {
-            graph.calculateAllPetals();
-
-            int max_petal = -1;
-            int node_max_petal = -1;
-            for (DirectedNode node : graph.nodeMap.values()) {
-                if (node.getPedal() > max_petal) {
-                    node_max_petal = node.getNodeID();
-                    max_petal = node.getPedal();
+        Packing packing = null;
+        if (graph.k > 4) { // 3 && graph.k <= Math.sqrt(graph.nodeMap.size()) - 1) {
+            int maxPetal = -1;
+            int maxPetalId = -1;
+            Set<Integer> petalSet = null;
+            for (Integer nodeId : new HashSet<>(graph.nodeMap.keySet())) {
+                // all petals will be greater than 0 after the cleaning cycle.
+                if (graph.nodeMap.get(nodeId).getPedal() > maxPetal) {
+                    Tuple currentFlower = graph.calculatePetal(nodeId);
+                    // if the found petal is still larger we will update the maximum flower
+                    if (currentFlower.getValue() > maxPetal) {
+                        maxPetalId = nodeId;
+                        maxPetal = currentFlower.getValue();
+                        petalSet = currentFlower.getSet();
+                    }
                 }
             }
 
-            if (node_max_petal != -1) {
+            if (maxPetalId != -1) {
                 graph.addStackCheckpoint();
-                graph.removeAllNodes(graph.calculatePetal(node_max_petal).getSet());
-                Packing packing = new Packing(graph);
-                if (k - packing.findCyclePacking().size() < max_petal) {
+                graph.removeAllNodes(petalSet);
+                packing = new Packing(graph);
+                int tempK = graph.k;
+                graph.k = 1000000;
+                graph.cleanGraph();
+                //graph.k = tempK - preClean.size();
+                //if (!preClean.isEmpty()) System.out.println("hier clean: " + preClean.size());
+                if (tempK - packing.findCyclePacking().size() + graph.solution.size() < maxPetal) {
+
                     graph.rebuildGraph();
-                    graph.removeNode(node_max_petal);
-                    cleanedNodes.add(node_max_petal);
-                    k--;
+                    graph.k = tempK;
+                    graph.removeNode(maxPetalId);
+                    cleanedNodes.add(maxPetalId);
+                    graph.k--;
+
+                    cleanedNodes.addAll(graph.solution);
+                    graph.solution.clear();
+
+                    Set<Integer> newDeletedNodes = graph.cleanGraph();
+                    if (newDeletedNodes == null) {
+                        return null;
+                    }
+                    cleanedNodes.addAll(newDeletedNodes);
+
                 } else {
                     graph.rebuildGraph();
+                    graph.k = tempK;
                 }
             }
         }
-        /*
-        Packing stacking = new Packing(graph);
 
-        stacking.getDigraphs();
-        Set<Integer> safeDiGraphNodes = stacking.getSafeToDeleteDigraphNodes();
-        if (safeDiGraphNodes.size() > k) {
-            return null;
-        }
-        k = k - safeDiGraphNodes.size();
-        graph.removeAllNodes(safeDiGraphNodes);
-
-        if (stacking.findCyclePacking().size() > k) {
+        if (graph.k < 0) {
             return null;
         }
 
-         */
+        if (graph.k > 4 && recursions % 5 == 0) {
+            long time = -System.nanoTime();
 
+            packing = new Packing(graph);
+            packing.getDigraphs();
+            Set<Integer> safeDiGraphNodes = packing.getSafeToDeleteDigraphNodes();
+            if (safeDiGraphNodes.size() > graph.k) {
+                return null;
+            }
+            if (!safeDiGraphNodes.isEmpty()) {
+                graph.k = graph.k - safeDiGraphNodes.size();
+                graph.removeAllNodes(safeDiGraphNodes);
+                cleanedNodes.addAll(safeDiGraphNodes);
+
+                Set<Integer> newDeletedNodes = graph.cleanGraph();
+                if (newDeletedNodes == null || graph.k < 0) {
+                    return null;
+                }
+                cleanedNodes.addAll(newDeletedNodes);
+
+                cleanedNodes.addAll(graph.solution);
+                graph.solution.clear();
+            }
+        }
+
+        if (graph.k < 0) {
+            return null;
+        }
+
+        if (packing == null) {
+            packing = new Packing(graph);
+        }
+        if (Math.max(packing.findCyclePacking().size(), packing.lowerDigraphBound()) > graph.k) {
+            return null;
+        }
+
+        Set<List<Integer>> remainingDigraphs = graph.cleanDigraphSet(fullDigraphs);
+        List<Integer> digraph = null;
+        if (!remainingDigraphs.isEmpty()) {
+            digraph = remainingDigraphs.iterator().next();
+        }
+        if (digraph != null && digraph.size() > 1) {
+            for (Integer v : digraph) {
+                // delete all vertices except one
+                graph.addStackCheckpoint();
+                Set<Integer> digraphWithoutV = new HashSet<>(digraph);
+                digraphWithoutV.remove(v);
+                graph.removeAllNodes(digraphWithoutV);
+
+                // branch with a maximum cost of k
+                // -1: Just deleted a node
+                // -cleanedNodes.size(): nodes that where removed during graph reduction
+                int kPrev = graph.k;
+                graph.k = graph.k - digraphWithoutV.size();
+                Set<Integer> dfvs = dfvsBranch(graph);
+
+                // if there is a valid solution in the recursion it will be returned
+                if (dfvs != null) {
+
+                    // Add the nodeId of the valid solution and all cleanedNodes
+                    dfvs.addAll(digraphWithoutV);
+                    dfvs.addAll(cleanedNodes);
+
+                    return dfvs;
+                } else {
+                    graph.rebuildGraph();
+                    graph.k = kPrev;
+                    graph.getNode(v).fixNode();
+                }
+            }
+        } else {
         // find a Cycle
+        graph.solution.clear();
         Deque<Integer> cycle = graph.findBestCycle();
+        cleanedNodes.addAll(graph.solution);
+        graph.solution.clear();
 
-        if (cycle == null) {
-
+        if (cycle == null && graph.k >= 0) {
             // The graph does not have any cycles
             // We will return the found cleanedNodes
-            //cleanedNodes.addAll(safeDiGraphNodes);
             return cleanedNodes;
+        }
 
+        if (cycle == null || graph.k <= 0) {
+            return null;
         }
 
 
@@ -96,16 +188,17 @@ public class Main {
             for (Integer v : sortedCycle.get(i)) {
 
                 // delete a vertex of the circle and branch for here
+
                 graph.addStackCheckpoint();
                 graph.removeNode(v);
+                int kPrev = graph.k;
+                graph.k--;
 
-                // increment recursions to keep track of tree size
-                recursions++;
 
                 // branch with a maximum cost of k
                 // -1: Just deleted a node
                 // -cleanedNodes.size(): nodes that where removed during graph reduction
-                Set<Integer> dfvs = dfvsBranch(graph, k - 1, false);
+                Set<Integer> dfvs = dfvsBranch(graph);
 
                 // if there is a valid solution in the recursion it will be returned
                 if (dfvs != null) {
@@ -113,14 +206,15 @@ public class Main {
                     // Add the nodeId of the valid solution and all cleanedNodes
                     dfvs.add(v);
                     dfvs.addAll(cleanedNodes);
-                    //dfvs.addAll(safeDiGraphNodes);
 
                     return dfvs;
                 } else {
                     graph.rebuildGraph();
+                    graph.k = kPrev;
                     graph.getNode(v).fixNode();
                 }
             }
+        }
         }
         return null;
     }
@@ -139,55 +233,94 @@ public class Main {
             allDfvs.addAll(newDeletedNodes);
         }
 
-        allDfvs.addAll(graph.cleanGraph(Integer.MAX_VALUE));
+        graph.k = Integer.MAX_VALUE;
+        allDfvs.addAll(graph.cleanGraph());
+        graph.k = 0;
 
         graph.clearStack();
         Set<DirectedGraph> SCCs = new Tarjan(graph).getSCCGraphs();
         graph.clearStack();
 
         for (DirectedGraph scc : SCCs) {
-            allDfvs.addAll(scc.cleanGraph(Integer.MAX_VALUE));
-            scc.clearStack();
 
-            Packing stacking = new Packing(scc);
-            int k = stacking.findCyclePacking().size();
+            Packing sccPacking = new Packing(scc);
+            int k = sccPacking.findCyclePacking().size();
+            fullDigraphs = sccPacking.getDigraphs();
 
             Set<Integer> dfvs = null;
 
             while (dfvs == null) {
                 scc.addStackCheckpoint();
-                dfvs = dfvsBranch(scc, k, true);
+                scc.k = k;
+                dfvs = dfvsBranch(scc);
                 k++;
                 scc.rebuildGraph();
+                scc.unfixAll();
             }
             allDfvs.addAll(dfvs);
         }
-
         return allDfvs;
     }
 
     public static void developMain(String file) {
+        int opt_sol = solSizes.get(file.substring(file.lastIndexOf('/') + 1));
         DirectedGraph graph = new DirectedGraph(file);
         graph.clearStack();
-        System.out.println("Solving: " + file);
+        System.out.print(file.substring(file.lastIndexOf('/') + 1));
         long time = -System.nanoTime();
-        System.out.println("\tk: " + dfvsSolve(graph).size());
-        System.out.println("\t#recursive steps: " + recursions);
+        int k = dfvsSolve(graph).size();
+        if (k != opt_sol) {
+            System.err.println("\nERROR!\tcorrect solution: " + opt_sol + "\n");
+        }
+        System.out.print("\tk: " + k);
+        System.out.print("\t#recursive steps: " + recursions);
+        //System.out.println("\t#petal calcs: " + petal + " - " + petal_suc);
+        //System.out.println("\t\ttime: " + utils.round(petal_time / 1_000_000_000.0, 4));
+        //System.out.println("\t#digraph calcs: " + digraph + " - " + digraph_suc);
+        //System.out.println("\t\ttime: " + utils.round(digraph_time / 1_000_000_000.0, 4));
         double sec = utils.round((time + System.nanoTime()) / 1_000_000_000.0, 4);
         System.out.println("\ttime: " + sec);
         recursions = 0;
+        petal = 0;
+        digraph = 0;
+        petal_suc = 0;
+        digraph_suc = 0;
+        petal_time = 0;
+        digraph_time = 0;
+    }
+
+    public static void productionMain(String args) {
+        DirectedGraph graph = new DirectedGraph(args);
+        Set<Integer> solution = dfvsSolve(graph);
+        for (int i : solution) {
+            System.out.println(i);
+        }
+        System.out.println("#recursive steps: " + recursions);
     }
 
     public static void main(String[] args) {
 
-        File file = new File("instances/complex");
+        /*
+        solSizes = utils.loadSolSizes();
+
+        long total_time = -System.nanoTime();
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("instances/run_me.txt"));
+            String line = br.readLine();
+            boolean solve = true;
+            while (line != null) {
+                if (line.equals("instances/complex/chess-n_100")) {
+                    solve = true;
+                }
+                if(solve)developMain(line);
+                line = br.readLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         /*
-        for (File inst : file.listFiles()) {
-            developMain(inst.getPath());
-        }
-        /*/
-        developMain("instances/complex/chess-n_1000 "); // 60
+        developMain("instances/complex/chess-n_1000"); // 60
         developMain("instances/complex/health-n_1000");// 232
         developMain("instances/complex/link-kv-n_300"); // 55
         developMain("instances/complex/biology-n_25-m_231-p_0.9-6"); // 8
@@ -201,43 +334,30 @@ public class Main {
         developMain("instances/synthetic/synth-n_100-m_1235-k_20-p_0.2.txt"); // 20
         developMain("instances/synthetic/synth-n_90-m_327-k_30-p_0.05.txt"); // 14
 
+        // Falsch gelöste Instanzen
+        developMain("instances/synthetic/synth-n_200-m_1115-k_15-p_0.05.txt"); // 15
+        developMain("instances/synthetic/synth-n_300-m_2561-k_30-p_0.05.txt"); // 30
+        developMain("instances/synthetic/synth-n_275-m_2220-k_30-p_0.05.txt"); // 30
 
+        developMain("instances/synthetic/synth-n_160-m_683-k_8-p_0.05.txt"); //6
 
         developMain("instances/synthetic/synth-n_50-m_357-k_20-p_0.2.txt");//20
         developMain("instances/synthetic/synth-n_140-m_1181-k_20-p_0.1.txt"); //20
-        developMain("instances/synthetic/synth-n_120-m_492-k_30-p_0.05.txt"); //21
-        /*
-        DirectedGraph graph = new DirectedGraph(
-                args[0]);
-        Set<Integer> solution = dfvsSolve(graph);
-        if (solution != null) {
-            for (int i : solution) {
-                System.out.println(i);
-            }
-        }
-        System.out.println("#recursive steps: " + recursions);
+
+        //developMain("instances/synthetic/synth-n_120-m_492-k_30-p_0.05.txt"); //21
+        developMain("instances/synthetic/synth-n_80-m_444-k_25-p_0.1.txt"); //20
+        developMain("instances/complex/usairport-n_700");
+
+
+        //developMain("instances/synthetic/synth-n_70-m_342-k_30-p_0.1.txt"); //19
+
          */
+
+        //System.out.println("\nTotal time: " + utils.round((total_time + System.nanoTime()) / 1_000_000_000.0, 4) + "sec");
+        productionMain(args[0]);
     }
 }
 /*
-Solving: instances/complex/chess-n_1000
-	k: 60
-	#recursive steps: 14805
-	time: 11.1876
-Solving: instances/complex/biology-n_35-m_315-p_0.75-18
-	k: 15
-	#recursive steps: 34718
-	time: 6.6971
-Solving: instances/complex/link-kv-n_300
-	k: 55
-	#recursive steps: 120
-	time: 0.009
-Solving: instances/complex/biology-n_30-m_287-p_0.5-5
-	k: 15
-	#recursive steps: 32768
-	time: 5.4951
-Solving: instances/complex/biology-n_35-m_315-p_0.5-18
-	k: 17
-	#recursive steps: 42901
-	time: 9.4446
+Correct in:
+Total time: 32.5907sec
  */
