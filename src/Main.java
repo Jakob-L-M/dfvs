@@ -7,6 +7,13 @@ import java.util.*;
 public class Main {
 
     public static int recursions;
+    public static long rootTime;
+    public static long cleaningTime;
+    public static long packingTime;
+    public static long flowerTime;
+    public static long digraphTime;
+    public static long branchingTime;
+    public static int firstLowerbound;
     public static Set<List<Integer>> fullDigraphs;
     public static Map<String, Integer> solSizes;
     public static Map<String, List<Double>> timeMap;
@@ -226,6 +233,7 @@ public class Main {
     }
 
     public static Set<Integer> dfvsSolve(DirectedGraph graph) {
+        rootTime = -System.nanoTime();
         Packing packing = new Packing(graph);
         packing.getDigraphs();
         Set<Integer> newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
@@ -246,7 +254,7 @@ public class Main {
         graph.clearStack();
         Set<DirectedGraph> SCCs = new Tarjan(graph).getSCCGraphs();
         graph.clearStack();
-
+        rootTime += System.nanoTime();
         for (DirectedGraph scc : SCCs) {
 
             Packing sccPacking = new Packing(scc);
