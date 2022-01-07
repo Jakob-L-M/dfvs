@@ -60,6 +60,14 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             DirectedNode node = nodeMap.get(nodeId);
             if (node == null) continue;
 
+            // if the node is a selfCycle we will remove it and reduce k
+            if (node.isSelfCycle()) {
+                removeNode(nodeId);
+                this.k--;
+                deletedNodes.add(nodeId);
+                continue;
+            }
+
             // if the node is a sink or source we will remove it and recursively remove all newly
             // created sinks and sources
             if (node.isSinkSource()) {
@@ -303,7 +311,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     }
 
     public boolean hasAllNodes(Set<Integer> nodes) {
-        boolean allContained = true;
+        boolean allContained;
         for (Integer u : nodes) {
             allContained = nodeMap.containsKey(u);
             if (!allContained) return false;
@@ -506,7 +514,6 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             parent.put(i, -1);
         }
         for (Integer start : nodeMap.keySet()) {
-            if (visited.contains(start)) continue;
             Deque<Integer> queue = new ArrayDeque<>();
             Deque<Integer> tempCycle = new ArrayDeque<>();
             queue.add(start);
@@ -545,8 +552,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 return tempCycle;
             }
         }
-        if (cycle.isEmpty()) return null;
-        return cycle;
+        return null;
     }
 
 
