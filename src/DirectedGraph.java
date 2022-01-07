@@ -8,6 +8,19 @@ import java.util.*;
 
 
 public class DirectedGraph implements Comparable<DirectedGraph> {
+    public int recursions = 0;
+    public long rootTime = 0L;
+    public long cleaningTime = 0L;
+    public long packingTime = 0L;
+    public long flowerTime = 0L;
+    public long digraphTime = 0L;
+    public long branchingTime = 0L;
+    public long totalTime = 0L;
+    public long cycleSearchTime = 0L;
+    public int firstLowerbound = 0;
+    public int firstDigraphNodes = 0;
+    public int firstCleans = 0;
+    public boolean interrupt = false;
     final Stack<StackTuple> stack = new Stack<>();
     Map<Integer, DirectedNode> nodeMap = new HashMap<>();
     BiMap<String, Integer> dict = HashBiMap.create();
@@ -41,8 +54,6 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         }
     }
 
-    public DirectedGraph() {
-    }
 
     public Set<Integer> cleanGraph() {
 

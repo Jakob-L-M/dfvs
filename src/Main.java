@@ -2,19 +2,7 @@ import java.io.*;
 import java.util.*;
 
 public class Main {
-    public static int timeout = 120_000;
-    public static int recursions;
-    public static long rootTime;
-    public static long cleaningTime;
-    public static long packingTime;
-    public static long flowerTime;
-    public static long digraphTime;
-    public static long branchingTime;
-    public static long totalTime;
-    public static long cycleSearchTime;
-    public static int firstLowerbound;
-    public static int firstDigraphNodes;
-    public static int firstCleans;
+    public static int timeout = 5_000;
     public static Set<List<Integer>> fullDigraphs;
     public static Map<String, Integer> solSizes;
     public static Map<String, List<Double>> timeMap;
@@ -25,20 +13,19 @@ public class Main {
     private static int costK;
     private static int costRec;
     private static boolean costEnabled;
-    private static boolean interrupt;
 
     public static Set<Integer> dfvsBranch(DirectedGraph graph) {
 
-        if (interrupt) {
+        if (graph.interrupt) {
             return null;
         }
         // increment recursions to keep track of tree size
-        recursions++;
+        graph.recursions++;
 
         // clean the graph if the budget limit is reached we can break here
-        cleaningTime -= System.nanoTime();
+        graph.cleaningTime -= System.nanoTime();
         Set<Integer> cleanedNodes = graph.cleanGraph();
-        cleaningTime += System.nanoTime();
+        graph.cleaningTime += System.nanoTime();
 
         if (cleanedNodes == null) {
             return null;
@@ -47,8 +34,8 @@ public class Main {
 
         Packing packing = null;
 
-        if (petalEnabled && graph.k > petalK && recursions % petalRec == 0) { // 3 && graph.k <= Math.sqrt(graph.nodeMap.size()) - 1) {
-            flowerTime -= System.nanoTime();
+        if (petalEnabled && graph.k > petalK && graph.recursions % petalRec == 0) { // 3 && graph.k <= Math.sqrt(graph.nodeMap.size()) - 1) {
+            graph.flowerTime -= System.nanoTime();
             int maxPetal = -1;
             int maxPetalId = -1;
             Set<Integer> petalSet = null;
@@ -86,7 +73,7 @@ public class Main {
                     graph.solution.clear();
                     Set<Integer> newDeletedNodes = graph.cleanGraph();
                     if (newDeletedNodes == null) {
-                        flowerTime += System.nanoTime();
+                        graph.flowerTime += System.nanoTime();
                         return null;
                     }
                     cleanedNodes.addAll(newDeletedNodes);
@@ -96,23 +83,21 @@ public class Main {
                     graph.k = tempK;
                 }
             }
-            flowerTime += System.nanoTime();
+            graph.flowerTime += System.nanoTime();
         }
-
 
 
         if (graph.k < 0) {
             return null;
         }
 
-        if (costEnabled && graph.k > costK && recursions % costRec == 0) {
-            long time = -System.nanoTime();
+        if (costEnabled && graph.k > costK && graph.recursions % costRec == 0) {
 
-            digraphTime -= System.nanoTime();
+            graph.digraphTime -= System.nanoTime();
             packing = new Packing(graph);
             packing.getDigraphs();
             Set<Integer> safeDiGraphNodes = packing.getSafeToDeleteDigraphNodes();
-            digraphTime += System.nanoTime();
+            graph.digraphTime += System.nanoTime();
             if (safeDiGraphNodes.size() > graph.k) {
                 return null;
             }
@@ -140,23 +125,23 @@ public class Main {
             packing = new Packing(graph);
         }
 
-        packingTime -= System.nanoTime();
+        graph.packingTime -= System.nanoTime();
         if (Math.max(packing.findCyclePacking().size(), packing.lowerDigraphBound()) > graph.k) {
-            packingTime += System.nanoTime();
+            graph.packingTime += System.nanoTime();
             return null;
         }
-        packingTime += System.nanoTime();
+        graph.packingTime += System.nanoTime();
 
-        digraphTime -= System.nanoTime();
+        graph.digraphTime -= System.nanoTime();
         Set<List<Integer>> remainingDigraphs = graph.cleanDigraphSet(fullDigraphs);
         List<Integer> digraph = null;
         if (!remainingDigraphs.isEmpty()) {
             digraph = remainingDigraphs.iterator().next();
         }
-        digraphTime += System.nanoTime();
+        graph.digraphTime += System.nanoTime();
         if (digraph != null && digraph.size() > 1) {
             for (Integer v : digraph) {
-                if (interrupt) return null;
+                if (graph.interrupt) return null;
                 // delete all vertices except one
                 graph.addStackCheckpoint();
                 Set<Integer> digraphWithoutV = new HashSet<>(digraph);
@@ -187,9 +172,9 @@ public class Main {
         } else {
             // find a Cycle
             graph.solution.clear();
-            cycleSearchTime = -System.nanoTime();
+            graph.cycleSearchTime = -System.nanoTime();
             Deque<Integer> cycle = graph.findBestCycle();
-            cycleSearchTime += System.nanoTime();
+            graph.cycleSearchTime += System.nanoTime();
             cleanedNodes.addAll(graph.solution);
             graph.solution.clear();
 
@@ -203,7 +188,7 @@ public class Main {
                 return null;
             }
 
-            branchingTime -= System.nanoTime();
+            graph.branchingTime -= System.nanoTime();
             Map<Integer, List<Integer>> sortedCycle = new HashMap<>();
             for (Integer v : cycle) {
                 graph.calculatePetal(v);
@@ -214,13 +199,13 @@ public class Main {
             }
             List<Integer> pedalValues = new ArrayList<>(sortedCycle.keySet());
             pedalValues.sort(Collections.reverseOrder());
-            branchingTime += System.nanoTime();
+            graph.branchingTime += System.nanoTime();
 
 
             for (Integer i : pedalValues) {
 
                 for (Integer v : sortedCycle.get(i)) {
-                    if (interrupt) return null;
+                    if (graph.interrupt) return null;
                     // delete a vertex of the circle and branch for here
 
                     graph.addStackCheckpoint();
@@ -254,18 +239,8 @@ public class Main {
     }
 
     public static Set<Integer> dfvsSolve(DirectedGraph graph) {
-        rootTime = -System.nanoTime();
-        totalTime = -System.nanoTime();
-        cleaningTime = 0L;
-        packingTime = 0L;
-        flowerTime = 0L;
-        digraphTime = 0L;
-        branchingTime = 0L;
-        cycleSearchTime = 0L;
-        firstCleans = 0;
-        firstLowerbound = 0;
-        firstDigraphNodes = 0;
-        recursions = 0;
+        graph.rootTime = -System.nanoTime();
+        graph.totalTime = -System.nanoTime();
         Packing packing = new Packing(graph);
         packing.getDigraphs();
         Set<Integer> newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
@@ -278,29 +253,29 @@ public class Main {
             graph.removeAllNodes(newDeletedNodes);
             allDfvs.addAll(newDeletedNodes);
         }
-        firstDigraphNodes = allDfvs.size();
+        graph.firstDigraphNodes = allDfvs.size();
         graph.k = Integer.MAX_VALUE;
         allDfvs.addAll(graph.cleanGraph());
-        firstCleans = allDfvs.size() - firstDigraphNodes;
+        graph.firstCleans = allDfvs.size() - graph.firstDigraphNodes;
         graph.k = 0;
 
         graph.clearStack();
         Set<DirectedGraph> SCCs = new Tarjan(graph).getSCCGraphs();
         graph.clearStack();
-        rootTime += System.nanoTime();
+        graph.rootTime += System.nanoTime();
         for (DirectedGraph scc : SCCs) {
-            packingTime -= System.nanoTime();
+            graph.packingTime -= System.nanoTime();
             Packing sccPacking = new Packing(scc);
             int k = sccPacking.findCyclePacking().size();
-            firstLowerbound += k;
-            packingTime += System.nanoTime();
-            digraphTime -= System.nanoTime();
+            graph.firstLowerbound += k;
+            graph.packingTime += System.nanoTime();
+            graph.digraphTime -= System.nanoTime();
             fullDigraphs = sccPacking.getDigraphs();
-            digraphTime += System.nanoTime();
+            graph.digraphTime += System.nanoTime();
 
             Set<Integer> dfvs = null;
 
-            while (dfvs == null && !interrupt) {
+            while (dfvs == null && !graph.interrupt) {
                 scc.addStackCheckpoint();
                 scc.k = k;
                 dfvs = dfvsBranch(scc);
@@ -309,15 +284,16 @@ public class Main {
                 scc.unfixAll();
             }
 
-            if (interrupt) {
+            if (graph.interrupt) {
                 return null;
             }
             allDfvs.addAll(dfvs);
         }
-        totalTime += System.nanoTime();
+        graph.totalTime += System.nanoTime();
         return allDfvs;
     }
 
+    /*
     public static void developMain(String file) {
         String name = file.substring(file.lastIndexOf('/') + 1);
         int opt_sol = solSizes.get(name);
@@ -347,8 +323,9 @@ public class Main {
         //System.out.println(name + "\tk: " + k + "\t#recursive steps: " + recursions + "\ttime: " + sec);
         recursions = 0;
     }
+    */
 
-    public static void productionMain(String args) throws IOException {
+    public static void productionMain(String args, DirectedGraph graph) throws IOException {
         petalK = 4;
         petalRec = 16;
         costRec = 49;
@@ -356,10 +333,9 @@ public class Main {
         petalEnabled = true;
         costEnabled = true;
 
-        DirectedGraph graph = new DirectedGraph(args);
         Set<Integer> solution = dfvsSolve(graph);
         File f = new File("times.csv");
-        if(!f.exists()) {
+        if (!f.exists()) {
             BufferedWriter writer = new BufferedWriter(new FileWriter("times.csv", true));
             writer.write("name,recursions,rootTime,cleaningTime,packingTime,flowerTime,digraphTime," +
                     "busyCycleBranchingTime,cycleSearchTime,totalTime,firstLowerbound,firstDigraphNodes,firstCleans");
@@ -369,39 +345,26 @@ public class Main {
         BufferedWriter writer = new BufferedWriter(new FileWriter("times.csv", true));
         writer.newLine();
         if (solution == null) {
-            writer.write(args + "," + recursions + "," + rootTime + "," + cleaningTime + "," + packingTime  + "," + flowerTime
-                    + "," + digraphTime  + "," + branchingTime + "," + cycleSearchTime + ",-1," + firstLowerbound
-                    + "," + firstDigraphNodes + "," + firstCleans);
+            writer.write(args + "," + graph.recursions + "," + graph.rootTime + "," + graph.cleaningTime + "," + graph.packingTime + "," + graph.flowerTime
+                    + "," + graph.digraphTime + "," + graph.branchingTime + "," + graph.cycleSearchTime + ",-1," + graph.firstLowerbound
+                    + "," + graph.firstDigraphNodes + "," + graph.firstCleans);
         } else {
-            writer.write(args + "," + recursions + "," + rootTime + "," + cleaningTime + "," + packingTime + "," + flowerTime
-                    + "," + digraphTime + "," + branchingTime + "," + cycleSearchTime  + "," + totalTime + "," + firstLowerbound
-                    + "," + firstDigraphNodes + "," + firstCleans);
-            for (int i : solution) {
-                //System.out.println(i);
-            }
+            writer.write(args + "," + graph.recursions + "," + graph.rootTime + "," + graph.cleaningTime + "," + graph.packingTime + "," + graph.flowerTime
+                    + "," + graph.digraphTime + "," + graph.branchingTime + "," + graph.cycleSearchTime + "," + graph.totalTime + "," + graph.firstLowerbound
+                    + "," + graph.firstDigraphNodes + "," + graph.firstCleans);
 
-            System.out.println(args + "#recursive steps: " + recursions);
+            System.out.println(args + "\t#recursive steps: " + graph.recursions);
         }
         writer.close();
     }
 
-    public static void main(String[] args) throws IOException {
-
-
-        //solSizes = utils.loadSolSizes();
-
-        //rootLowerbounds();
-        File instances = new File("instances/complex");
-        for (File file : instances.listFiles()) {
-            //productionMain(file.getPath());
-        }
-        File finalInstances = instances;
-
+    public static void main(String[] args) {
         Stack<String> files = new Stack<>();
         try {
             BufferedReader br = new BufferedReader(new FileReader("instances/all_files.txt"));
             String line = br.readLine();
-            while (line != null) {
+            int c = 0;
+            while (line != null && c++ < 100) {
                 File file = new File(line);
                 if (file.exists()) files.add(line);
                 line = br.readLine();
@@ -410,59 +373,45 @@ public class Main {
             e.printStackTrace();
         }
 
+        System.out.println(files.size());
 
-        Thread t1 = new Thread(() -> {
-            while (!files.isEmpty()) {
-                String finalLine = files.pop();
-                Thread t = new Thread(() -> {
+        int numThreads = 4;
+        List<Thread> threadList = new ArrayList<>();
+        for (int i = 0; i < numThreads; i++) {
+            Thread thread = new Thread(() -> {
+                while (!files.isEmpty()) {
+                    String finalLine = files.pop();
+                    DirectedGraph graph = new DirectedGraph(finalLine);
+                    Thread t = new Thread(() -> {
+                        try {
+                            productionMain(finalLine, graph);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    });
+                    t.start();
                     try {
-                        productionMain(finalLine);
-                    } catch (IOException e) {
+                        t.join(timeout); //Time-Limit
+                        if (t.isAlive()) {
+                            graph.interrupt = true;
+                            t.join();
+                            graph.interrupt = false;
+                        }
+                    } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
-                });
-                t.start();
-                try {
-                    t.join(timeout); //Time-Limit
-                    if (t.isAlive()) {
-                        interrupt = true;
-                        t.join();
-                        interrupt = false;
-                    }
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
                 }
-            }
-        });
-/*
-        Thread t2 = new Thread(() -> {
-            while (!files.isEmpty()) {
-                String finalLine = files.pop();
-                Thread t = new Thread(() -> {
-                    try {
-                        productionMain(finalLine);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                });
-                t.start();
-                try {
-                    t.join(timeout); //Time-Limit
-                    if (t.isAlive()) {
-                        interrupt = true;
-                        t.join();
-                        interrupt = false;
-                    }
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        });*/
-        t1.start();
-        //t2.start();
+            });
+            threadList.add(thread);
+        }
+
+        for (Thread thread : threadList) {
+            thread.start();
+        }
         try {
-            t1.join();
-            //t2.join();
+            for (Thread thread : threadList) {
+                thread.join();
+            }
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -487,43 +436,40 @@ public class Main {
         //productionMain(args[0]);
         //productionMain("instances/complex/advotogo-n_100");*/
     }
-
-    private static void parameterOptimization() {
-        // fill Maps
-        timeMap = new TreeMap<>();
-        recMap = new HashMap<>();
-        try {
-            BufferedReader br = new BufferedReader(new FileReader("instances/run_me.txt"));
-            String line = br.readLine();
-            while (line != null) {
-                line = line.split("\t")[0];
-                timeMap.put(line.substring(line.lastIndexOf('/') + 1), new ArrayList<>());
-                recMap.put(line.substring(line.lastIndexOf('/') + 1), new ArrayList<>());
-                line = br.readLine();
+    /*
+        private static void parameterOptimization() {
+            // fill Maps
+            timeMap = new TreeMap<>();
+            recMap = new HashMap<>();
+            try {
+                BufferedReader br = new BufferedReader(new FileReader("instances/run_me.txt"));
+                String line = br.readLine();
+                while (line != null) {
+                    line = line.split("\t")[0];
+                    timeMap.put(line.substring(line.lastIndexOf('/') + 1), new ArrayList<>());
+                    recMap.put(line.substring(line.lastIndexOf('/') + 1), new ArrayList<>());
+                    line = br.readLine();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        petalK = 4;
-        petalRec = 16;
-        costRec = 49;
-        costK = 9;
-        petalEnabled = true;
-        costEnabled = true;
-        for (int i : List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)) {
-            petalK = i;
-            System.out.println("petalK: " + petalK + " | petalRec: " + petalRec + " | costK: " + costK + " | costRec: " + costRec);
-            run5kRec();
-        }
-        /*
-        for (int i : List.of(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)) {
-            costK = i;
-            System.out.println("petalK: " + petalK + " | petalRec: " + petalRec + " | costK: " + costK + " | costRec: " + costRec);
-            run5kRec();
-        }
+            petalK = 4;
+            petalRec = 16;
+            costRec = 49;
+            costK = 9;
+            petalEnabled = true;
+            costEnabled = true;
+            for (int i : List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)) {
+                petalK = i;
+                System.out.println("petalK: " + petalK + " | petalRec: " + petalRec + " | costK: " + costK + " | costRec: " + costRec);
+                run5kRec();
+            }
+            for (int i : List.of(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)) {
+                costK = i;
+                System.out.println("petalK: " + petalK + " | petalRec: " + petalRec + " | costK: " + costK + " | costRec: " + costRec);
+                run5kRec();
+            }
 
-         */
-        printTimeMap(timeMap);
     }
 
     private static void rootLowerbounds() {
@@ -581,6 +527,7 @@ public class Main {
             System.out.println();
         }
     }
+
 
     private static void run5kRec() {
         Stack<String> files = new Stack<>();
@@ -643,6 +590,8 @@ public class Main {
             e.printStackTrace();
         }
     }
+
+     */
 }
 /*
 Correct in:
