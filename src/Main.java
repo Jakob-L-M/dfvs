@@ -1,5 +1,5 @@
 import java.io.BufferedReader;
-import java.io.FileNotFoundException;
+import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
@@ -7,17 +7,23 @@ import java.util.*;
 public class Main {
 
     public static int recursions;
-    public static int petal;
-    public static long petal_time;
-    public static int petal_suc;
-    public static int digraph;
-    public static long digraph_time;
-    public static int digraph_suc;
     public static Set<List<Integer>> fullDigraphs;
     public static Map<String, Integer> solSizes;
+    public static Map<String, List<Double>> timeMap;
+    public static Map<String, List<Integer>> recMap;
+    private static int petalK;
+    private static int petalRec;
+    private static boolean petalEnabled;
+    private static int costK;
+    private static int costRec;
+    private static boolean costEnabled;
+    private static boolean interrupt;
 
     public static Set<Integer> dfvsBranch(DirectedGraph graph) {
 
+        if (interrupt) {
+            return null;
+        }
         // increment recursions to keep track of tree size
         recursions++;
 
@@ -29,7 +35,7 @@ public class Main {
         }
 
         Packing packing = null;
-        if (graph.k > 4) { // 3 && graph.k <= Math.sqrt(graph.nodeMap.size()) - 1) {
+        if (petalEnabled && graph.k > petalK && recursions % petalRec == 0) { // 3 && graph.k <= Math.sqrt(graph.nodeMap.size()) - 1) {
             int maxPetal = -1;
             int maxPetalId = -1;
             Set<Integer> petalSet = null;
@@ -83,7 +89,7 @@ public class Main {
             return null;
         }
 
-        if (graph.k > 4 && recursions % 5 == 0) {
+        if (costEnabled && graph.k > costK && recursions % costRec == 0) {
             long time = -System.nanoTime();
 
             packing = new Packing(graph);
@@ -154,67 +160,67 @@ public class Main {
                 }
             }
         } else {
-        // find a Cycle
-        graph.solution.clear();
-        Deque<Integer> cycle = graph.findBestCycle();
-        cleanedNodes.addAll(graph.solution);
-        graph.solution.clear();
+            // find a Cycle
+            graph.solution.clear();
+            Deque<Integer> cycle = graph.findBestCycle();
+            cleanedNodes.addAll(graph.solution);
+            graph.solution.clear();
 
-        if (cycle == null && graph.k >= 0) {
-            // The graph does not have any cycles
-            // We will return the found cleanedNodes
-            return cleanedNodes;
-        }
-
-        if (cycle == null || graph.k <= 0) {
-            return null;
-        }
-
-
-        Map<Integer, List<Integer>> sortedCycle = new HashMap<>();
-        for (Integer v : cycle) {
-            graph.calculatePetal(v);
-            if (!sortedCycle.containsKey(graph.getNode(v).getPedal())) {
-                sortedCycle.put(graph.getNode(v).getPedal(), new ArrayList<>());
+            if (cycle == null && graph.k >= 0) {
+                // The graph does not have any cycles
+                // We will return the found cleanedNodes
+                return cleanedNodes;
             }
-            sortedCycle.get(graph.getNode(v).getPedal()).add(v);
-        }
-        List<Integer> pedalValues = new ArrayList<>(sortedCycle.keySet());
-        pedalValues.sort(Collections.reverseOrder());
+
+            if (cycle == null || graph.k <= 0) {
+                return null;
+            }
 
 
-        for (Integer i : pedalValues) {
+            Map<Integer, List<Integer>> sortedCycle = new HashMap<>();
+            for (Integer v : cycle) {
+                graph.calculatePetal(v);
+                if (!sortedCycle.containsKey(graph.getNode(v).getPedal())) {
+                    sortedCycle.put(graph.getNode(v).getPedal(), new ArrayList<>());
+                }
+                sortedCycle.get(graph.getNode(v).getPedal()).add(v);
+            }
+            List<Integer> pedalValues = new ArrayList<>(sortedCycle.keySet());
+            pedalValues.sort(Collections.reverseOrder());
 
-            for (Integer v : sortedCycle.get(i)) {
 
-                // delete a vertex of the circle and branch for here
+            for (Integer i : pedalValues) {
 
-                graph.addStackCheckpoint();
-                graph.removeNode(v);
-                int kPrev = graph.k;
-                graph.k--;
+                for (Integer v : sortedCycle.get(i)) {
+
+                    // delete a vertex of the circle and branch for here
+
+                    graph.addStackCheckpoint();
+                    graph.removeNode(v);
+                    int kPrev = graph.k;
+                    graph.k--;
 
 
-                // branch with a maximum cost of k
-                // -1: Just deleted a node
-                // -cleanedNodes.size(): nodes that where removed during graph reduction
-                Set<Integer> dfvs = dfvsBranch(graph);
+                    // branch with a maximum cost of k
+                    // -1: Just deleted a node
+                    // -cleanedNodes.size(): nodes that where removed during graph reduction
+                    Set<Integer> dfvs = dfvsBranch(graph);
 
-                // if there is a valid solution in the recursion it will be returned
-                if (dfvs != null) {
+                    // if there is a valid solution in the recursion it will be returned
+                    if (dfvs != null) {
 
-                    // Add the nodeId of the valid solution and all cleanedNodes
-                    dfvs.add(v);
-                    dfvs.addAll(cleanedNodes);
+                        // Add the nodeId of the valid solution and all cleanedNodes
+                        dfvs.add(v);
+                        dfvs.addAll(cleanedNodes);
 
-                    return dfvs;
-                } else {
-                    graph.rebuildGraph();
-                    graph.k = kPrev;
-                    graph.getNode(v).fixNode();
+                        return dfvs;
+                    } else {
+                        graph.rebuildGraph();
+                        graph.k = kPrev;
+                        graph.getNode(v).fixNode();
+                    }
                 }
             }
-        }
         }
         return null;
     }
@@ -249,7 +255,7 @@ public class Main {
 
             Set<Integer> dfvs = null;
 
-            while (dfvs == null) {
+            while (dfvs == null && !interrupt) {
                 scc.addStackCheckpoint();
                 scc.k = k;
                 dfvs = dfvsBranch(scc);
@@ -257,39 +263,53 @@ public class Main {
                 scc.rebuildGraph();
                 scc.unfixAll();
             }
+
+            if (interrupt) {
+                return null;
+            }
             allDfvs.addAll(dfvs);
         }
         return allDfvs;
     }
 
     public static void developMain(String file) {
-        int opt_sol = solSizes.get(file.substring(file.lastIndexOf('/') + 1));
+        String name = file.substring(file.lastIndexOf('/') + 1);
+        int opt_sol = solSizes.get(name);
         DirectedGraph graph = new DirectedGraph(file);
         graph.clearStack();
-        System.out.print(file.substring(file.lastIndexOf('/') + 1));
         long time = -System.nanoTime();
-        int k = dfvsSolve(graph).size();
-        if (k != opt_sol) {
-            System.err.println("\nERROR!\tcorrect solution: " + opt_sol + "\n");
+        int k;
+        try {
+            k = dfvsSolve(graph).size();
+        } catch (NullPointerException e) {
+            //System.out.println(name + "\tTimelimit");
+            timeMap.get(name).add(20.0);
+            recMap.get(name).add(recursions);
+            recursions = 0;
+            return;
         }
-        System.out.print("\tk: " + k);
-        System.out.print("\t#recursive steps: " + recursions);
+        if (k != opt_sol) {
+            //System.err.println("\nERROR!\tcorrect solution: " + opt_sol + "\n");
+        }
         //System.out.println("\t#petal calcs: " + petal + " - " + petal_suc);
         //System.out.println("\t\ttime: " + utils.round(petal_time / 1_000_000_000.0, 4));
         //System.out.println("\t#digraph calcs: " + digraph + " - " + digraph_suc);
         //System.out.println("\t\ttime: " + utils.round(digraph_time / 1_000_000_000.0, 4));
         double sec = utils.round((time + System.nanoTime()) / 1_000_000_000.0, 4);
-        System.out.println("\ttime: " + sec);
+        timeMap.get(name).add(sec);
+        recMap.get(name).add(recursions);
+        //System.out.println(name + "\tk: " + k + "\t#recursive steps: " + recursions + "\ttime: " + sec);
         recursions = 0;
-        petal = 0;
-        digraph = 0;
-        petal_suc = 0;
-        digraph_suc = 0;
-        petal_time = 0;
-        digraph_time = 0;
     }
 
     public static void productionMain(String args) {
+        petalK = 4;
+        petalRec = 16;
+        costRec = 49;
+        costK = 9;
+        petalEnabled = true;
+        costEnabled = true;
+
         DirectedGraph graph = new DirectedGraph(args);
         Set<Integer> solution = dfvsSolve(graph);
         for (int i : solution) {
@@ -300,61 +320,169 @@ public class Main {
 
     public static void main(String[] args) {
 
-        /*
+
         solSizes = utils.loadSolSizes();
 
-        long total_time = -System.nanoTime();
+        rootLowerbounds();
+
+        //productionMain(args[0]);
+    }
+
+    private static void parameterOptimization() {
+        // fill Maps
+        timeMap = new TreeMap<>();
+        recMap = new HashMap<>();
         try {
             BufferedReader br = new BufferedReader(new FileReader("instances/run_me.txt"));
             String line = br.readLine();
-            boolean solve = true;
             while (line != null) {
-                if (line.equals("instances/complex/chess-n_100")) {
-                    solve = true;
-                }
-                if(solve)developMain(line);
+                line = line.split("\t")[0];
+                timeMap.put(line.substring(line.lastIndexOf('/') + 1), new ArrayList<>());
+                recMap.put(line.substring(line.lastIndexOf('/') + 1), new ArrayList<>());
                 line = br.readLine();
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
-
+        petalK = 4;
+        petalRec = 16;
+        costRec = 49;
+        costK = 9;
+        petalEnabled = true;
+        costEnabled = true;
+        for (int i : List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)) {
+            petalK = i;
+            System.out.println("petalK: " + petalK + " | petalRec: " + petalRec + " | costK: " + costK + " | costRec: " + costRec);
+            run5kRec();
+        }
         /*
-        developMain("instances/complex/chess-n_1000"); // 60
-        developMain("instances/complex/health-n_1000");// 232
-        developMain("instances/complex/link-kv-n_300"); // 55
-        developMain("instances/complex/biology-n_25-m_231-p_0.9-6"); // 8
-        developMain("instances/complex/biology-n_30-m_287-p_0.5-5"); // 15
-        developMain("instances/complex/biology-n_35-m_315-p_0.5-18"); // 17
-
-        developMain("instances/synthetic/synth-n_40-m_203-k_8-p_0.2.txt"); // 7
-        developMain("instances/synthetic/synth-n_60-m_110-k_2-p_0.05.txt");// 1
-        developMain("instances/synthetic/synth-n_60-m_386-k_4-p_0.2.txt"); // 4
-        developMain("instances/synthetic/synth-n_200-m_1172-k_20-p_0.05.txt"); // 20
-        developMain("instances/synthetic/synth-n_100-m_1235-k_20-p_0.2.txt"); // 20
-        developMain("instances/synthetic/synth-n_90-m_327-k_30-p_0.05.txt"); // 14
-
-        // Falsch gelöste Instanzen
-        developMain("instances/synthetic/synth-n_200-m_1115-k_15-p_0.05.txt"); // 15
-        developMain("instances/synthetic/synth-n_300-m_2561-k_30-p_0.05.txt"); // 30
-        developMain("instances/synthetic/synth-n_275-m_2220-k_30-p_0.05.txt"); // 30
-
-        developMain("instances/synthetic/synth-n_160-m_683-k_8-p_0.05.txt"); //6
-
-        developMain("instances/synthetic/synth-n_50-m_357-k_20-p_0.2.txt");//20
-        developMain("instances/synthetic/synth-n_140-m_1181-k_20-p_0.1.txt"); //20
-
-        //developMain("instances/synthetic/synth-n_120-m_492-k_30-p_0.05.txt"); //21
-        developMain("instances/synthetic/synth-n_80-m_444-k_25-p_0.1.txt"); //20
-        developMain("instances/complex/usairport-n_700");
-
-
-        //developMain("instances/synthetic/synth-n_70-m_342-k_30-p_0.1.txt"); //19
+        for (int i : List.of(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)) {
+            costK = i;
+            System.out.println("petalK: " + petalK + " | petalRec: " + petalRec + " | costK: " + costK + " | costRec: " + costRec);
+            run5kRec();
+        }
 
          */
+        printTimeMap(timeMap);
+    }
 
-        //System.out.println("\nTotal time: " + utils.round((total_time + System.nanoTime()) / 1_000_000_000.0, 4) + "sec");
-        productionMain(args[0]);
+    private static void rootLowerbounds() {
+        File files = new File("instances/all/");
+        for (File file : files.listFiles()) {
+            DirectedGraph graph = new DirectedGraph(file.getPath());
+
+            String name = file.getPath().substring(14);
+
+            System.out.print(name);
+
+            graph.k = Integer.MAX_VALUE;
+            Set<Integer> allDfvs = new HashSet<>(graph.cleanGraph());
+            graph.k = 0;
+
+            Packing packing = new Packing(graph);
+            packing.getDigraphs();
+            Set<Integer> newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
+            graph.removeAllNodes(newDeletedNodes);
+            allDfvs.addAll(newDeletedNodes);
+            while (!newDeletedNodes.isEmpty()) {
+                packing = new Packing(graph);
+                packing.getDigraphs();
+                newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
+                graph.removeAllNodes(newDeletedNodes);
+                allDfvs.addAll(newDeletedNodes);
+            }
+
+            graph.k = Integer.MAX_VALUE;
+            allDfvs.addAll(graph.cleanGraph());
+            graph.k = 0;
+
+            graph.clearStack();
+            Set<DirectedGraph> SCCs = new Tarjan(graph).getSCCGraphs();
+            graph.clearStack();
+
+            int lowerbound = allDfvs.size();
+            for (DirectedGraph scc : SCCs) {
+
+                Packing sccPacking = new Packing(scc);
+                int k = sccPacking.findCyclePacking().size();
+                lowerbound += k;
+            }
+            System.out.println(";" + solSizes.get(name) + ";" + lowerbound);
+        }
+    }
+
+    private static void printTimeMap(Map<String, List<Double>> map) {
+        for (String key : map.keySet()) {
+            List<Double> times = map.get(key);
+            System.out.print(key);
+            for (Double time : times) {
+                System.out.print("\t" + time);
+            }
+            System.out.println();
+        }
+    }
+
+    private static void run5kRec() {
+        Stack<String> files = new Stack<>();
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("instances/run_me.txt"));
+            String line = br.readLine();
+            while (line != null) {
+                line = line.split("\t")[0];
+                files.add(line);
+                line = br.readLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        Thread t1 = new Thread(() -> {
+            while (!files.isEmpty()) {
+                String finalLine = files.pop();
+                Thread t = new Thread(() -> {
+                    developMain(finalLine);
+                });
+                t.start();
+                try {
+                    t.join(20_000); //Time-Limit
+                    if (t.isAlive()) {
+
+                        interrupt = true;
+                        t.join();
+                        interrupt = false;
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        Thread t2 = new Thread(() -> {
+            while (!files.isEmpty()) {
+                String finalLine = files.pop();
+                Thread t = new Thread(() -> {
+                    developMain(finalLine);
+                });
+                t.start();
+                try {
+                    t.join(20_000); //Time-Limit
+                    if (t.isAlive()) {
+
+                        interrupt = true;
+                        t.join();
+                        interrupt = false;
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        t1.start();
+        t2.start();
+        try {
+            t1.join();
+            t2.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 }
 /*
