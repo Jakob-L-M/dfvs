@@ -1,11 +1,8 @@
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
 public class Main {
-
+    public static int timeout = 120_000;
     public static int recursions;
     public static long rootTime;
     public static long cleaningTime;
@@ -13,7 +10,11 @@ public class Main {
     public static long flowerTime;
     public static long digraphTime;
     public static long branchingTime;
+    public static long totalTime;
+    public static long cycleSearchTime;
     public static int firstLowerbound;
+    public static int firstDigraphNodes;
+    public static int firstCleans;
     public static Set<List<Integer>> fullDigraphs;
     public static Map<String, Integer> solSizes;
     public static Map<String, List<Double>> timeMap;
@@ -35,14 +36,19 @@ public class Main {
         recursions++;
 
         // clean the graph if the budget limit is reached we can break here
+        cleaningTime -= System.nanoTime();
         Set<Integer> cleanedNodes = graph.cleanGraph();
+        cleaningTime += System.nanoTime();
 
         if (cleanedNodes == null) {
             return null;
         }
 
+
         Packing packing = null;
+
         if (petalEnabled && graph.k > petalK && recursions % petalRec == 0) { // 3 && graph.k <= Math.sqrt(graph.nodeMap.size()) - 1) {
+            flowerTime -= System.nanoTime();
             int maxPetal = -1;
             int maxPetalId = -1;
             Set<Integer> petalSet = null;
@@ -65,10 +71,10 @@ public class Main {
                 packing = new Packing(graph);
                 int tempK = graph.k;
                 graph.k = 1000000;
+
                 graph.cleanGraph();
-                //graph.k = tempK - preClean.size();
-                //if (!preClean.isEmpty()) System.out.println("hier clean: " + preClean.size());
-                if (tempK - packing.findCyclePacking().size() + graph.solution.size() < maxPetal) {
+                int packingSize = packing.findCyclePacking().size();
+                if (tempK - packingSize + graph.solution.size() < maxPetal) {
 
                     graph.rebuildGraph();
                     graph.k = tempK;
@@ -78,9 +84,9 @@ public class Main {
 
                     cleanedNodes.addAll(graph.solution);
                     graph.solution.clear();
-
                     Set<Integer> newDeletedNodes = graph.cleanGraph();
                     if (newDeletedNodes == null) {
+                        flowerTime += System.nanoTime();
                         return null;
                     }
                     cleanedNodes.addAll(newDeletedNodes);
@@ -90,7 +96,10 @@ public class Main {
                     graph.k = tempK;
                 }
             }
+            flowerTime += System.nanoTime();
         }
+
+
 
         if (graph.k < 0) {
             return null;
@@ -99,9 +108,11 @@ public class Main {
         if (costEnabled && graph.k > costK && recursions % costRec == 0) {
             long time = -System.nanoTime();
 
+            digraphTime -= System.nanoTime();
             packing = new Packing(graph);
             packing.getDigraphs();
             Set<Integer> safeDiGraphNodes = packing.getSafeToDeleteDigraphNodes();
+            digraphTime += System.nanoTime();
             if (safeDiGraphNodes.size() > graph.k) {
                 return null;
             }
@@ -128,17 +139,24 @@ public class Main {
         if (packing == null) {
             packing = new Packing(graph);
         }
+
+        packingTime -= System.nanoTime();
         if (Math.max(packing.findCyclePacking().size(), packing.lowerDigraphBound()) > graph.k) {
+            packingTime += System.nanoTime();
             return null;
         }
+        packingTime += System.nanoTime();
 
+        digraphTime -= System.nanoTime();
         Set<List<Integer>> remainingDigraphs = graph.cleanDigraphSet(fullDigraphs);
         List<Integer> digraph = null;
         if (!remainingDigraphs.isEmpty()) {
             digraph = remainingDigraphs.iterator().next();
         }
+        digraphTime += System.nanoTime();
         if (digraph != null && digraph.size() > 1) {
             for (Integer v : digraph) {
+                if (interrupt) return null;
                 // delete all vertices except one
                 graph.addStackCheckpoint();
                 Set<Integer> digraphWithoutV = new HashSet<>(digraph);
@@ -169,7 +187,9 @@ public class Main {
         } else {
             // find a Cycle
             graph.solution.clear();
+            cycleSearchTime = -System.nanoTime();
             Deque<Integer> cycle = graph.findBestCycle();
+            cycleSearchTime += System.nanoTime();
             cleanedNodes.addAll(graph.solution);
             graph.solution.clear();
 
@@ -183,7 +203,7 @@ public class Main {
                 return null;
             }
 
-
+            branchingTime -= System.nanoTime();
             Map<Integer, List<Integer>> sortedCycle = new HashMap<>();
             for (Integer v : cycle) {
                 graph.calculatePetal(v);
@@ -194,12 +214,13 @@ public class Main {
             }
             List<Integer> pedalValues = new ArrayList<>(sortedCycle.keySet());
             pedalValues.sort(Collections.reverseOrder());
+            branchingTime += System.nanoTime();
 
 
             for (Integer i : pedalValues) {
 
                 for (Integer v : sortedCycle.get(i)) {
-
+                    if (interrupt) return null;
                     // delete a vertex of the circle and branch for here
 
                     graph.addStackCheckpoint();
@@ -234,6 +255,17 @@ public class Main {
 
     public static Set<Integer> dfvsSolve(DirectedGraph graph) {
         rootTime = -System.nanoTime();
+        totalTime = -System.nanoTime();
+        cleaningTime = 0L;
+        packingTime = 0L;
+        flowerTime = 0L;
+        digraphTime = 0L;
+        branchingTime = 0L;
+        cycleSearchTime = 0L;
+        firstCleans = 0;
+        firstLowerbound = 0;
+        firstDigraphNodes = 0;
+        recursions = 0;
         Packing packing = new Packing(graph);
         packing.getDigraphs();
         Set<Integer> newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
@@ -246,9 +278,10 @@ public class Main {
             graph.removeAllNodes(newDeletedNodes);
             allDfvs.addAll(newDeletedNodes);
         }
-
+        firstDigraphNodes = allDfvs.size();
         graph.k = Integer.MAX_VALUE;
         allDfvs.addAll(graph.cleanGraph());
+        firstCleans = allDfvs.size() - firstDigraphNodes;
         graph.k = 0;
 
         graph.clearStack();
@@ -256,10 +289,14 @@ public class Main {
         graph.clearStack();
         rootTime += System.nanoTime();
         for (DirectedGraph scc : SCCs) {
-
+            packingTime -= System.nanoTime();
             Packing sccPacking = new Packing(scc);
             int k = sccPacking.findCyclePacking().size();
+            firstLowerbound += k;
+            packingTime += System.nanoTime();
+            digraphTime -= System.nanoTime();
             fullDigraphs = sccPacking.getDigraphs();
+            digraphTime += System.nanoTime();
 
             Set<Integer> dfvs = null;
 
@@ -277,6 +314,7 @@ public class Main {
             }
             allDfvs.addAll(dfvs);
         }
+        totalTime += System.nanoTime();
         return allDfvs;
     }
 
@@ -310,7 +348,7 @@ public class Main {
         recursions = 0;
     }
 
-    public static void productionMain(String args) {
+    public static void productionMain(String args) throws IOException {
         petalK = 4;
         petalRec = 16;
         costRec = 49;
@@ -320,20 +358,134 @@ public class Main {
 
         DirectedGraph graph = new DirectedGraph(args);
         Set<Integer> solution = dfvsSolve(graph);
-        for (int i : solution) {
-            System.out.println(i);
+        File f = new File("times.csv");
+        if(!f.exists()) {
+            BufferedWriter writer = new BufferedWriter(new FileWriter("times.csv", true));
+            writer.write("name,recursions,rootTime,cleaningTime,packingTime,flowerTime,digraphTime," +
+                    "busyCycleBranchingTime,cycleSearchTime,totalTime,firstLowerbound,firstDigraphNodes,firstCleans");
+            writer.close();
         }
-        System.out.println("#recursive steps: " + recursions);
+
+        BufferedWriter writer = new BufferedWriter(new FileWriter("times.csv", true));
+        writer.newLine();
+        if (solution == null) {
+            writer.write(args + "," + recursions + "," + rootTime + "," + cleaningTime + "," + packingTime  + "," + flowerTime
+                    + "," + digraphTime  + "," + branchingTime + "," + cycleSearchTime + ",-1," + firstLowerbound
+                    + "," + firstDigraphNodes + "," + firstCleans);
+        } else {
+            writer.write(args + "," + recursions + "," + rootTime + "," + cleaningTime + "," + packingTime + "," + flowerTime
+                    + "," + digraphTime + "," + branchingTime + "," + cycleSearchTime  + "," + totalTime + "," + firstLowerbound
+                    + "," + firstDigraphNodes + "," + firstCleans);
+            for (int i : solution) {
+                //System.out.println(i);
+            }
+
+            System.out.println(args + "#recursive steps: " + recursions);
+        }
+        writer.close();
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
 
 
-        solSizes = utils.loadSolSizes();
+        //solSizes = utils.loadSolSizes();
 
-        rootLowerbounds();
+        //rootLowerbounds();
+        File instances = new File("instances/complex");
+        for (File file : instances.listFiles()) {
+            //productionMain(file.getPath());
+        }
+        File finalInstances = instances;
 
+        Stack<String> files = new Stack<>();
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("instances/all_files.txt"));
+            String line = br.readLine();
+            while (line != null) {
+                File file = new File(line);
+                if (file.exists()) files.add(line);
+                line = br.readLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
+        Thread t1 = new Thread(() -> {
+            while (!files.isEmpty()) {
+                String finalLine = files.pop();
+                Thread t = new Thread(() -> {
+                    try {
+                        productionMain(finalLine);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                });
+                t.start();
+                try {
+                    t.join(timeout); //Time-Limit
+                    if (t.isAlive()) {
+                        interrupt = true;
+                        t.join();
+                        interrupt = false;
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+/*
+        Thread t2 = new Thread(() -> {
+            while (!files.isEmpty()) {
+                String finalLine = files.pop();
+                Thread t = new Thread(() -> {
+                    try {
+                        productionMain(finalLine);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                });
+                t.start();
+                try {
+                    t.join(timeout); //Time-Limit
+                    if (t.isAlive()) {
+                        interrupt = true;
+                        t.join();
+                        interrupt = false;
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });*/
+        t1.start();
+        //t2.start();
+        try {
+            t1.join();
+            //t2.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+
+
+
+/*
+
+        instances = new File("instances/synthetic");
+        for (File file : instances.listFiles()) {
+            productionMain(file.getPath());
+        }
+        instances = new File("instances/complex3");
+        for (File file : instances.listFiles()) {
+            productionMain(file.getPath());
+        }
+        instances = new File("instances/synthetic3");
+        for (File file : instances.listFiles()) {
+            productionMain(file.getPath());
+        }
         //productionMain(args[0]);
+        //productionMain("instances/complex/advotogo-n_100");*/
     }
 
     private static void parameterOptimization() {
@@ -453,7 +605,6 @@ public class Main {
                 try {
                     t.join(20_000); //Time-Limit
                     if (t.isAlive()) {
-
                         interrupt = true;
                         t.join();
                         interrupt = false;
