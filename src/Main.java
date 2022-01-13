@@ -17,7 +17,6 @@ public class Main {
     public static long packingTime;
     public static long flowerTime;
     public static long digraphTime;
-    public static long branchingTime;
     public static int firstLowerbound;
     public static Set<List<Integer>> fullDigraphs;
     public static Map<String, Integer> solSizes;
@@ -72,8 +71,6 @@ public class Main {
                 int tempK = graph.k;
                 graph.k = 1000000;
                 graph.cleanGraph();
-                //graph.k = tempK - preClean.size();
-                //if (!preClean.isEmpty()) System.out.println("hier clean: " + preClean.size());
                 if (tempK - packing.findCyclePacking().size() + graph.solution.size() < maxPetal) {
 
                     graph.rebuildGraph();
@@ -103,7 +100,6 @@ public class Main {
         }
 
         if (costEnabled && graph.k > costK && recursions % costRec == 0) {
-            long time = -System.nanoTime();
 
             packing = new Packing(graph);
             packing.getDigraphs();
@@ -294,11 +290,8 @@ public class Main {
         long time = -System.nanoTime();
         int k;
         try {
-            Set<Integer> solution = dfvsSolve(graph);
-            System.out.println(solution);
-            k = solution.size();
+            k = dfvsSolve(graph).size();
         } catch (NullPointerException e) {
-            //System.out.println(name + "\tTimelimit");
             timeMap.get(name).add(20.0);
             recMap.get(name).add(recursions);
             recursions = 0;
@@ -307,10 +300,6 @@ public class Main {
         if (k != opt_sol) {
             System.err.println("\nERROR!\tcorrect solution: " + opt_sol + "\n");
         }
-        //System.out.println("\t#petal calcs: " + petal + " - " + petal_suc);
-        //System.out.println("\t\ttime: " + utils.round(petal_time / 1_000_000_000.0, 4));
-        //System.out.println("\t#digraph calcs: " + digraph + " - " + digraph_suc);
-        //System.out.println("\t\ttime: " + utils.round(digraph_time / 1_000_000_000.0, 4));
         double sec = utils.round((time + System.nanoTime()) / 1_000_000_000.0, 4);
         System.out.println(name + "\tk: " + k + "\t#recursive steps: " + recursions + "\ttime: " + sec);
         recursions = 0;
@@ -326,6 +315,7 @@ public class Main {
 
         DirectedGraph graph = new DirectedGraph(args);
         Set<Integer> solution = dfvsSolve(graph);
+        assert solution != null;
         for (int i : solution) {
             System.out.println(i);
         }
@@ -334,8 +324,12 @@ public class Main {
 
     public static void main(String[] args) throws IOException, GRBException {
 
+        // timelimit in seconds for gurobi
+        double timelimit = 180.0;
+
         env = new GRBEnv();
         env.set(GRB.IntParam.OutputFlag, 0);
+        env.set(GRB.DoubleParam.TimeLimit, timelimit);
         env.start();
 
         solSizes = utils.loadSolSizes();
@@ -358,7 +352,7 @@ public class Main {
             } else {
                 optk = solSizes.get(instance.substring(instance.lastIndexOf("/") + 1));
             }
-            //instance = "./instances/complex/talk-oc-n_300";
+
             DirectedGraph graph = new DirectedGraph(instance);
             System.out.print(instance);
             long fileTime = -System.nanoTime();
@@ -369,21 +363,25 @@ public class Main {
                 graph.createTopoLPFile();
                 fileSec = utils.round((fileTime + System.nanoTime()) / 1_000_000_000.0, 4);
 
-                k = ilp("topoLp/" + instance.substring(instance.indexOf("instances/") + 10));
+                k = ilp("topoLp/" + instance.substring(instance.indexOf("instances/") + 10), timelimit);
             }
+            if (k == -1) {
+                System.out.println(",-1," + fileSec + "," + timelimit);
+            } else {
 
-            if (optk != k) {
-                System.err.print(" ! Incorrect Solution ! ");
+                if (optk != k) {
+                    System.err.print(" ! Incorrect Solution ! ");
+                }
+
+                double sec = utils.round((time + System.nanoTime()) / 1_000_000_000.0, 4);
+                System.out.println("," + k + "," + fileSec + "," + sec);
             }
-
-            double sec = utils.round((time + System.nanoTime()) / 1_000_000_000.0, 4);
-            System.out.println("," + k + "," + fileSec + "," + sec);
             instance = br.readLine();
             //break;
         }
     }
 
-    private static int ilp(String file) {
+    private static int ilp(String file, double timelimit) {
 
         try {
             GRBModel model = new GRBModel(env, file);
@@ -394,6 +392,7 @@ public class Main {
 
             if (optimstatus == GRB.Status.INF_OR_UNBD) {
                 model.set(GRB.IntParam.Presolve, 0);
+                model.set(GRB.DoubleParam.TimeLimit, timelimit);
                 model.optimize();
                 optimstatus = model.get(GRB.IntAttr.Status);
             }
@@ -403,18 +402,17 @@ public class Main {
                 return (int) Math.round(objval);
             } else if (optimstatus == GRB.Status.INFEASIBLE) {
                 System.out.println("Model is infeasible");
-
-                // Compute and write out IIS
                 model.computeIIS();
                 model.write("model.ilp");
             } else if (optimstatus == GRB.Status.UNBOUNDED) {
                 System.out.println("Model is unbounded");
-            } else {
+            } else if (optimstatus == GRB.Status.TIME_LIMIT) {
+                return -1;
+            }
+            else {
                 System.out.println("Optimization was stopped with status = "
                         + optimstatus);
             }
-
-            // Dispose of model and environment
             model.dispose();
             env.dispose();
 
@@ -422,7 +420,7 @@ public class Main {
             System.out.println("Error code: " + e.getErrorCode() + ". " +
                     e.getMessage());
         }
-        return 0;
+        return -1;
     }
 
     private static void parameterOptimization() {
