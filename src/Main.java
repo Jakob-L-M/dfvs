@@ -1,3 +1,8 @@
+import gurobi.GRB;
+import gurobi.GRBEnv;
+import gurobi.GRBException;
+import gurobi.GRBModel;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -18,12 +23,13 @@ public class Main {
     public static Map<String, Integer> solSizes;
     public static Map<String, List<Double>> timeMap;
     public static Map<String, List<Integer>> recMap;
-    private static int petalK;
-    private static int petalRec;
-    private static boolean petalEnabled;
-    private static int costK;
-    private static int costRec;
-    private static boolean costEnabled;
+    public static GRBEnv env;
+    private static int petalK = 4;
+    private static int petalRec = 16;
+    private static boolean petalEnabled = true;
+    private static int costK = 9;
+    private static int costRec = 49;
+    private static boolean costEnabled = true;
     private static boolean interrupt;
 
     public static Set<Integer> dfvsBranch(DirectedGraph graph) {
@@ -288,7 +294,9 @@ public class Main {
         long time = -System.nanoTime();
         int k;
         try {
-            k = dfvsSolve(graph).size();
+            Set<Integer> solution = dfvsSolve(graph);
+            System.out.println(solution);
+            k = solution.size();
         } catch (NullPointerException e) {
             //System.out.println(name + "\tTimelimit");
             timeMap.get(name).add(20.0);
@@ -297,16 +305,14 @@ public class Main {
             return;
         }
         if (k != opt_sol) {
-            //System.err.println("\nERROR!\tcorrect solution: " + opt_sol + "\n");
+            System.err.println("\nERROR!\tcorrect solution: " + opt_sol + "\n");
         }
         //System.out.println("\t#petal calcs: " + petal + " - " + petal_suc);
         //System.out.println("\t\ttime: " + utils.round(petal_time / 1_000_000_000.0, 4));
         //System.out.println("\t#digraph calcs: " + digraph + " - " + digraph_suc);
         //System.out.println("\t\ttime: " + utils.round(digraph_time / 1_000_000_000.0, 4));
         double sec = utils.round((time + System.nanoTime()) / 1_000_000_000.0, 4);
-        timeMap.get(name).add(sec);
-        recMap.get(name).add(recursions);
-        //System.out.println(name + "\tk: " + k + "\t#recursive steps: " + recursions + "\ttime: " + sec);
+        System.out.println(name + "\tk: " + k + "\t#recursive steps: " + recursions + "\ttime: " + sec);
         recursions = 0;
     }
 
@@ -326,14 +332,97 @@ public class Main {
         System.out.println("#recursive steps: " + recursions);
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException, GRBException {
 
+        env = new GRBEnv();
+        env.set(GRB.IntParam.OutputFlag, 0);
+        env.start();
 
         solSizes = utils.loadSolSizes();
+        Map<String, Integer> solSizes3 = utils.loadSolSizes3();
 
-        rootLowerbounds();
+        BufferedReader br = new BufferedReader(new FileReader("instances/week3_no_timeout.txt"));
+        String instance = br.readLine();
 
-        //productionMain(args[0]);
+        System.out.println("instance,k,fileTime,totalTime");
+
+        while (instance != null) {
+            instance = instance.split("\t")[0];
+            long time = -System.nanoTime();
+
+            String name = instance.substring(instance.indexOf("instances/") + 10);
+            name = name.substring(0, name.indexOf("/"));
+            int optk;
+            if (name.contains("3")) {
+                optk = solSizes3.get(instance.substring(instance.lastIndexOf("/") + 1));
+            } else {
+                optk = solSizes.get(instance.substring(instance.lastIndexOf("/") + 1));
+            }
+            //instance = "./instances/complex/talk-oc-n_300";
+            DirectedGraph graph = new DirectedGraph(instance);
+            System.out.print(instance);
+            long fileTime = -System.nanoTime();
+
+            int k = 0;
+            double fileSec = 0.0;
+            if (graph.nodeMap.size() > 0) {
+                graph.createTopoLPFile();
+                fileSec = utils.round((fileTime + System.nanoTime()) / 1_000_000_000.0, 4);
+
+                k = ilp("topoLp/" + instance.substring(instance.indexOf("instances/") + 10));
+            }
+
+            if (optk != k) {
+                System.err.print(" ! Incorrect Solution ! ");
+            }
+
+            double sec = utils.round((time + System.nanoTime()) / 1_000_000_000.0, 4);
+            System.out.println("," + k + "," + fileSec + "," + sec);
+            instance = br.readLine();
+            //break;
+        }
+    }
+
+    private static int ilp(String file) {
+
+        try {
+            GRBModel model = new GRBModel(env, file);
+
+            model.optimize();
+
+            int optimstatus = model.get(GRB.IntAttr.Status);
+
+            if (optimstatus == GRB.Status.INF_OR_UNBD) {
+                model.set(GRB.IntParam.Presolve, 0);
+                model.optimize();
+                optimstatus = model.get(GRB.IntAttr.Status);
+            }
+
+            if (optimstatus == GRB.Status.OPTIMAL) {
+                double objval = model.get(GRB.DoubleAttr.ObjVal);
+                return (int) Math.round(objval);
+            } else if (optimstatus == GRB.Status.INFEASIBLE) {
+                System.out.println("Model is infeasible");
+
+                // Compute and write out IIS
+                model.computeIIS();
+                model.write("model.ilp");
+            } else if (optimstatus == GRB.Status.UNBOUNDED) {
+                System.out.println("Model is unbounded");
+            } else {
+                System.out.println("Optimization was stopped with status = "
+                        + optimstatus);
+            }
+
+            // Dispose of model and environment
+            model.dispose();
+            env.dispose();
+
+        } catch (GRBException e) {
+            System.out.println("Error code: " + e.getErrorCode() + ". " +
+                    e.getMessage());
+        }
+        return 0;
     }
 
     private static void parameterOptimization() {
@@ -375,11 +464,11 @@ public class Main {
     }
 
     private static void rootLowerbounds() {
-        File files = new File("instances/all/");
+        File files = new File("instances/complex/");
         for (File file : files.listFiles()) {
             DirectedGraph graph = new DirectedGraph(file.getPath());
 
-            String name = file.getPath().substring(14);
+            String name = file.getPath().substring(18);
 
             System.out.print(name);
 
@@ -409,13 +498,154 @@ public class Main {
             graph.clearStack();
 
             int lowerbound = allDfvs.size();
+            int cleaning = allDfvs.size();
+            for (DirectedGraph scc : SCCs) {
+                Packing sccPacking = new Packing(scc);
+                int k = sccPacking.findCyclePacking().size();
+                lowerbound += k;
+            }
+            System.out.println(";" + solSizes.get(name) + ";" + lowerbound + ";" + cleaning + ";c");
+        }
+        files = new File("instances/synthetic/");
+        for (File file : files.listFiles()) {
+            DirectedGraph graph = new DirectedGraph(file.getPath());
+
+            String name = file.getPath().substring(20);
+
+            System.out.print(name);
+
+            graph.k = Integer.MAX_VALUE;
+            Set<Integer> allDfvs = new HashSet<>(graph.cleanGraph());
+            graph.k = 0;
+
+            Packing packing = new Packing(graph);
+            packing.getDigraphs();
+            Set<Integer> newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
+            graph.removeAllNodes(newDeletedNodes);
+            allDfvs.addAll(newDeletedNodes);
+            while (!newDeletedNodes.isEmpty()) {
+                packing = new Packing(graph);
+                packing.getDigraphs();
+                newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
+                graph.removeAllNodes(newDeletedNodes);
+                allDfvs.addAll(newDeletedNodes);
+            }
+
+            graph.k = Integer.MAX_VALUE;
+            allDfvs.addAll(graph.cleanGraph());
+            graph.k = 0;
+
+            graph.clearStack();
+            Set<DirectedGraph> SCCs = new Tarjan(graph).getSCCGraphs();
+            graph.clearStack();
+
+            int lowerbound = allDfvs.size();
+            int cleaning = allDfvs.size();
             for (DirectedGraph scc : SCCs) {
 
                 Packing sccPacking = new Packing(scc);
                 int k = sccPacking.findCyclePacking().size();
                 lowerbound += k;
             }
-            System.out.println(";" + solSizes.get(name) + ";" + lowerbound);
+            System.out.println(";" + solSizes.get(name) + ";" + lowerbound + ";" + cleaning + ";s");
+        }
+    }
+
+    private static void rootLowerboundsWeek3() {
+        File files = new File("instances/complex3/");
+        for (File file : files.listFiles()) {
+            String name = file.getPath().substring(19);
+
+
+            if (solSizes.get(name) == -1) {
+                continue;
+            }
+
+            DirectedGraph graph = new DirectedGraph(file.getPath());
+
+            System.out.print(name);
+
+            graph.k = Integer.MAX_VALUE;
+            Set<Integer> allDfvs = new HashSet<>(graph.cleanGraph());
+            graph.k = 0;
+
+            Packing packing = new Packing(graph);
+            packing.getDigraphs();
+            Set<Integer> newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
+            graph.removeAllNodes(newDeletedNodes);
+            allDfvs.addAll(newDeletedNodes);
+            while (!newDeletedNodes.isEmpty()) {
+                packing = new Packing(graph);
+                packing.getDigraphs();
+                newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
+                graph.removeAllNodes(newDeletedNodes);
+                allDfvs.addAll(newDeletedNodes);
+            }
+
+            graph.k = Integer.MAX_VALUE;
+            allDfvs.addAll(graph.cleanGraph());
+            graph.k = 0;
+
+            graph.clearStack();
+            Set<DirectedGraph> SCCs = new Tarjan(graph).getSCCGraphs();
+            graph.clearStack();
+
+            int lowerbound = allDfvs.size();
+            int cleaning = allDfvs.size();
+            for (DirectedGraph scc : SCCs) {
+                Packing sccPacking = new Packing(scc);
+                int k = sccPacking.findCyclePacking().size();
+                lowerbound += k;
+            }
+            System.out.println(";" + solSizes.get(name) + ";" + lowerbound + ";" + cleaning + ";c");
+        }
+        files = new File("instances/synthetic3/");
+        for (File file : files.listFiles()) {
+
+            String name = file.getPath().substring(21);
+
+            if (solSizes.get(name) == -1) {
+                continue;
+            }
+
+            DirectedGraph graph = new DirectedGraph(file.getPath());
+
+            System.out.print(name);
+
+            graph.k = Integer.MAX_VALUE;
+            Set<Integer> allDfvs = new HashSet<>(graph.cleanGraph());
+            graph.k = 0;
+
+            Packing packing = new Packing(graph);
+            packing.getDigraphs();
+            Set<Integer> newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
+            graph.removeAllNodes(newDeletedNodes);
+            allDfvs.addAll(newDeletedNodes);
+            while (!newDeletedNodes.isEmpty()) {
+                packing = new Packing(graph);
+                packing.getDigraphs();
+                newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
+                graph.removeAllNodes(newDeletedNodes);
+                allDfvs.addAll(newDeletedNodes);
+            }
+
+            graph.k = Integer.MAX_VALUE;
+            allDfvs.addAll(graph.cleanGraph());
+            graph.k = 0;
+
+            graph.clearStack();
+            Set<DirectedGraph> SCCs = new Tarjan(graph).getSCCGraphs();
+            graph.clearStack();
+
+            int lowerbound = allDfvs.size();
+            int cleaning = allDfvs.size();
+            for (DirectedGraph scc : SCCs) {
+
+                Packing sccPacking = new Packing(scc);
+                int k = sccPacking.findCyclePacking().size();
+                lowerbound += k;
+            }
+            System.out.println(";" + solSizes.get(name) + ";" + lowerbound + ";" + cleaning + ";s");
         }
     }
 
