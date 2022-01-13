@@ -1,13 +1,12 @@
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
 
 public class DirectedGraph implements Comparable<DirectedGraph> {
+    final String name;
     final Stack<StackTuple> stack = new Stack<>();
     Map<Integer, DirectedNode> nodeMap = new HashMap<>();
     BiMap<String, Integer> dict = HashBiMap.create();
@@ -39,12 +38,18 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        name = fileName.substring(fileName.indexOf("instances/") + 10);
     }
 
     public DirectedGraph() {
+        name = "temp";
     }
 
     public Set<Integer> cleanGraph() {
+        return cleanGraph(true);
+    }
+
+    public Set<Integer> cleanGraph(boolean costlyDeletions) {
 
         Set<Integer> nodes = new HashSet<>(nodeMap.keySet());
         Set<Integer> deletedNodes = new HashSet<>();
@@ -61,9 +66,83 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             if (node == null) continue;
 
             // if the node is a selfCycle we will remove it and reduce k
-            if (node.isSelfCycle()) {
+            if (costlyDeletions && node.isSelfCycle()) {
                 removeNode(nodeId);
                 this.k--;
+                deletedNodes.add(nodeId);
+                continue;
+            }
+
+            // if the node is a sink or source we will remove it and recursively remove all newly
+            // created sinks and sources
+            if (node.isSinkSource()) {
+                removeSinkSource(nodeId);
+                change = true;
+                continue;
+            }
+
+            // clean chains
+            if (costlyDeletions && node.isChain()) {
+                int temp = cleanChain(nodeId);
+                if (temp != -1) {
+                    k--;
+                    deletedNodes.add(temp);
+                }
+                change = true;
+                continue;
+            }
+
+            // clean semi pendant triangle
+            if (costlyDeletions) {
+                Set<Integer> triangle = cleanSemiPendantTriangle(nodeId);
+                if (triangle != null) {
+                    k = k - 2;
+                    deletedNodes.addAll(triangle);
+                    change = true;
+                    continue;
+                }
+            }
+
+            // clean a flower if the leftover budget is greater than 2
+            if (costlyDeletions && k > 2) {
+                int temp = cleanPetal(nodeId);
+                if (temp != -1) {
+                    k--;
+                    deletedNodes.add(temp);
+                    change = true;
+                }
+            }
+
+        }
+
+        // repeat until nothing is left to be cleaned
+        if (change) {
+            Set<Integer> newNodes = cleanGraph(costlyDeletions);
+            if (newNodes != null) {
+                deletedNodes.addAll(newNodes);
+            } else {
+                return null;
+            }
+        }
+
+        return deletedNodes;
+    }
+
+    public Set<Integer> rootClean() {
+
+        Set<Integer> nodes = new HashSet<>(nodeMap.keySet());
+        Set<Integer> deletedNodes = new HashSet<>();
+        boolean change = false;
+
+        for (Integer nodeId : nodes) {
+
+            // first we check if the node is still present
+            DirectedNode node = nodeMap.get(nodeId);
+            if (node == null) continue;
+
+            // if the node is a selfCycle we will remove it and reduce k
+            if (node.isSelfCycle()) {
+                removeNode(nodeId);
                 deletedNodes.add(nodeId);
                 continue;
             }
@@ -80,7 +159,6 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             if (node.isChain()) {
                 int temp = cleanChain(nodeId);
                 if (temp != -1) {
-                    k--;
                     deletedNodes.add(temp);
                 }
                 change = true;
@@ -90,32 +168,16 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             // clean semi pendant triangle
             Set<Integer> triangle = cleanSemiPendantTriangle(nodeId);
             if (triangle != null) {
-                k = k - 2;
                 deletedNodes.addAll(triangle);
                 change = true;
-                continue;
-            }
-
-            // clean a flower if the leftover budget is greater than 2
-            if (k > 2) {
-                int temp = cleanPetal(nodeId);
-                if (temp != -1) {
-                    k--;
-                    deletedNodes.add(temp);
-                    change = true;
-                }
             }
 
         }
 
         // repeat until nothing is left to be cleaned
         if (change) {
-            Set<Integer> newNodes = cleanGraph();
-            if (newNodes != null) {
-                deletedNodes.addAll(newNodes);
-            } else {
-                return null;
-            }
+            Set<Integer> newNodes = rootClean();
+            deletedNodes.addAll(newNodes);
         }
 
         return deletedNodes;
@@ -272,9 +334,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             if (stack) {
                 this.stack.push(new StackTuple(false, preID, postID));
             }
-            nodeMap.get(preID).removeOutNode(postID);
-            nodeMap.get(postID).removeInNode(preID);
-            return true;
+            return nodeMap.get(preID).removeOutNode(postID) && nodeMap.get(postID).removeInNode(preID);
         }
         return false;
     }
@@ -336,7 +396,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     }
 
     public boolean removeNode(Integer nodeID) {
-       return removeNode(nodeID, true);
+        return removeNode(nodeID, true);
     }
 
     public void addStackCheckpoint() {
@@ -555,15 +615,12 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return null;
     }
 
-
-
-
-
     public void unfixAll() {
         for (DirectedNode node : nodeMap.values()) {
             node.unfixNode();
         }
     }
+
     public Set<Integer> getForbiddenNodes() {
         Set<Integer> forbidden = new HashSet<>();
         for (DirectedNode node : nodeMap.values()) {
@@ -601,6 +658,115 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             hash.append(nodeMap.get(nodeId).hashCode());
         }
         return hash.toString();
+    }
+
+    /**
+     * !INCORRECT!/!UNFINISHED! Method to generate an gurobi-LP File with all simple Cycles
+     */
+    public void createLPFile() {
+
+        try {
+            //System.out.println(name);
+            BufferedWriter bw = new BufferedWriter(new FileWriter("ilps/" + name + ".lp"));
+            bw.write("Minimize\n");
+
+            StringBuilder variables = new StringBuilder();
+            StringBuilder binaries = new StringBuilder();
+
+            for (Integer nodeId : nodeMap.keySet()) {
+                variables.append("x").append(nodeId).append(" + ");
+                binaries.append("x").append(nodeId).append(" ");
+            }
+            bw.write(variables.substring(0, variables.lastIndexOf("+") - 1));
+
+            bw.write("\nSubject To\n");
+
+            Deque<Integer> cycle = findBestCycle();
+            int counter = 0;
+            //System.out.println("Graph before:");
+            //System.out.println(this);
+            while (cycle != null) {
+                List<Integer> cycleCopy = new ArrayList<>(cycle);
+                StringBuilder constraint = new StringBuilder();
+                constraint.append('c').append(counter++).append(": ");
+                int parent = cycle.pop();
+                int first = parent;
+                constraint.append('x').append(parent).append(" + ");
+                for (Integer nodeId : cycle) {
+                    constraint.append('x').append(nodeId).append(" + ");
+                    if (!removeEdge(nodeId, parent, false)) {
+                        System.out.println("NO EDGE1");
+                    }
+                    parent = nodeId;
+                }
+                if (!removeEdge(first, parent)) {
+                    System.out.println("NO EDGE2" + " " + first + ", " + parent);
+                }
+                constraint.delete(constraint.length() - 3, constraint.length());
+                constraint.append(" >= 1");
+                System.out.println("Added: " + constraint + " for cycle: " + cycleCopy);
+                System.out.println(this);
+                System.out.println("-------------------");
+                bw.write(constraint + "\n");
+                cleanGraph(false);
+                cycle = findBestCycle();
+            }
+            bw.write("Binary\n");
+            bw.write(binaries.substring(0, binaries.length() - 1));
+            bw.write("\nEnd");
+
+            bw.close();
+            //System.out.println("Graph after:");
+            //System.out.println(this);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Creates an gurobi-LP file based on topological orders.
+     * Assumes that the graph is not empty.
+     * Files is stored in ILPs/[complex(3) or synthetic(3)/name.lp].
+     * Make sure the folders ILPs/complex, ILPs/synthetic, ILPs/complex3 and ILPs/synthetic3 exist.
+     */
+    public void createTopoLPFile() {
+
+        try {
+            //System.out.println(name);
+            BufferedWriter bw = new BufferedWriter(new FileWriter("topoLp/" + name + ".lp"));
+            bw.write("Minimize\n");
+
+            StringBuilder variables = new StringBuilder();
+            StringBuilder binaries = new StringBuilder();
+
+            for (Integer nodeId : nodeMap.keySet()) {
+                variables.append("x").append(nodeId).append(" + ");
+                binaries.append("x").append(nodeId).append(" ");
+            }
+            bw.write(variables.substring(0, variables.lastIndexOf("+") - 1));
+
+            bw.write("\nSubject To\n");
+
+            StringBuilder integers = new StringBuilder();
+
+            int n = nodeMap.size();
+            int counter = 0;
+            for (Integer nodeId : nodeMap.keySet()) {
+                for (Integer outNodeId : nodeMap.get(nodeId).getOutNodes()) {
+                    String constraint = "c" + (counter++) + ": u" + nodeId + " - u" + outNodeId + " + " + n + " x" + nodeId + " >= 1\n";
+                    integers.append("u").append(nodeId).append(" < ").append("u").append(outNodeId).append("\n");
+                    bw.write(constraint);
+                }
+            }
+            bw.write("\nIntegers\n");
+            bw.write(String.valueOf(integers));
+            bw.write("Binary\n");
+            bw.write(binaries.substring(0, binaries.length() - 1));
+            bw.write("\nEnd");
+            bw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
 
