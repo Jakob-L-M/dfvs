@@ -1,4 +1,5 @@
-import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
 
 public class DirectedNode {
     private final Integer nodeID;
@@ -33,7 +34,9 @@ public class DirectedNode {
         this.fixed = true;
     }
 
-    public void unfixNode() { this.fixed = false;}
+    public void unfixNode() {
+        this.fixed = false;
+    }
 
     public boolean isFixed() {
         return fixed;
@@ -43,14 +46,33 @@ public class DirectedNode {
         return this.nodeID;
     }
 
-    public boolean isChain() {return (outNodes.size() >= 1 && inNodes.size() == 1) || (outNodes.size() == 1 && inNodes.size() >= 1);}
+    public boolean isChain() {
+        return (outNodes.size() >= 1 && inNodes.size() == 1) || (outNodes.size() == 1 && inNodes.size() >= 1);
+    }
 
-    public boolean isSinkSource() {return outNodes.size() == 0 || inNodes.size() == 0;}
+    public boolean isSinkSource() {
+        return outNodes.size() == 0 || inNodes.size() == 0;
+    }
 
-    public boolean isSelfCycle() {return outNodes.contains(nodeID) || inNodes.contains(nodeID);}
+    public boolean isSelfCycle() {
+        return outNodes.contains(nodeID) || inNodes.contains(nodeID);
+    }
 
-    public boolean isTwoCycleWith(int otherNode) {return outNodes.contains(otherNode) && inNodes.contains(otherNode);}
+    /**
+     * Check if node builds a two-Cycle with a specific other node
+     *
+     * @param otherNode id of the node to be checked. Use isTwoCycle if searching for a two-Cycle
+     * @return whether or not the node builds a two-Cycle with the given NodeId
+     */
+    public boolean isTwoCycleWith(int otherNode) {
+        return outNodes.contains(otherNode) && inNodes.contains(otherNode);
+    }
 
+    /**
+     * Checks all neighbours for a two-Cycle
+     *
+     * @return id of a two-Cycle Node or -1 if node is not in any two-Cycle
+     */
     public int isTwoCycle() {
         if (outNodes.size() < inNodes.size()) {
             for (Integer outNode : outNodes) {
@@ -60,7 +82,7 @@ public class DirectedNode {
             }
         } else {
             for (Integer inNode : inNodes) {
-                if(outNodes.contains(inNode)) {
+                if (outNodes.contains(inNode)) {
                     return inNode;
                 }
             }
@@ -92,25 +114,9 @@ public class DirectedNode {
         this.pedal = pedal;
     }
 
-    public void setFixed(boolean fixed) {
-        this.fixed = fixed;
-    }
-
-    @Override
-    public DirectedNode clone() {
-        DirectedNode nodeCopy = new DirectedNode(this.nodeID);
-        for(int postNode : this.outNodes) {
-            nodeCopy.addOutNode(postNode);
-        }
-        for(int preNode : this.inNodes) {
-            nodeCopy.addInNode(preNode);
-        }
-        return nodeCopy;
-    }
-
     @Override
     public String toString() {
-        return "Node: " + nodeID + " - in: {" + inNodes + "}, out: {" + outNodes +"}";
+        return "Node: " + nodeID + " - in: {" + inNodes + "}, out: {" + outNodes + "}";
     }
 }
 
