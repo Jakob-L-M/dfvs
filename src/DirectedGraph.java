@@ -379,9 +379,9 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return true;
     }
 
-    public Set<List<Integer>> cleanDigraphSet(Set<List<Integer>> digraphs) {
-        Set<List<Integer>> cleanedDigraphs = new HashSet<>();
-        for (List<Integer> digraph : digraphs) {
+    public List<Set<Integer>> cleanDigraphSet(List<Set<Integer>> digraphs) {
+        List<Set<Integer>> cleanedDigraphs = new ArrayList<>();
+        for (Set<Integer> digraph : digraphs) {
             if (digraph.size() < 3) continue;
             boolean containsAll = true;
             for (Integer nodeID : digraph) {
@@ -686,7 +686,6 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             //System.out.println("Graph before:");
             //System.out.println(this);
             while (cycle != null) {
-                List<Integer> cycleCopy = new ArrayList<>(cycle);
                 StringBuilder constraint = new StringBuilder();
                 constraint.append('c').append(counter++).append(": ");
                 int parent = cycle.pop();
@@ -704,9 +703,6 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 }
                 constraint.delete(constraint.length() - 3, constraint.length());
                 constraint.append(" >= 1");
-                System.out.println("Added: " + constraint + " for cycle: " + cycleCopy);
-                System.out.println(this);
-                System.out.println("-------------------");
                 bw.write(constraint + "\n");
                 cleanGraph(false);
                 cycle = findBestCycle();
@@ -729,11 +725,10 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
      * Files is stored in ILPs/[complex(3) or synthetic(3)/name.lp].
      * Make sure the folders ILPs/complex, ILPs/synthetic, ILPs/complex3 and ILPs/synthetic3 exist.
      */
-    public void createTopoLPFile() {
+    public void createTopoLPFile(String filename, List<Set<Integer>> digraphs) {
 
         try {
-            //System.out.println(name);
-            BufferedWriter bw = new BufferedWriter(new FileWriter("topoLp/" + name + ".lp"));
+            BufferedWriter bw = new BufferedWriter(new FileWriter(filename));
             bw.write("Minimize\n");
 
             StringBuilder variables = new StringBuilder();
@@ -746,27 +741,80 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             bw.write(variables.substring(0, variables.lastIndexOf("+") - 1));
 
             bw.write("\nSubject To\n");
-
-            StringBuilder integers = new StringBuilder();
-
-            int n = nodeMap.size();
             int counter = 0;
+
+            // #### DIGRAPHS ####
+            if (digraphs != null && !digraphs.isEmpty()) {
+                for (Set<Integer> digraph : digraphs) {
+                    if (digraph.size() < 3) {
+                        continue;
+                    }
+                    StringBuilder constraint = new StringBuilder();
+                    constraint.append('c').append(counter++).append(": ");
+                    for (Integer nodeId : digraph) {
+                        constraint.append('x').append(nodeId).append(" + ");
+                    }
+                    constraint.delete(constraint.length() - 3, constraint.length() - 1);
+                    constraint.append(">= ").append(digraph.size() - 1).append("\n");
+                    bw.write(constraint.toString());
+                }
+            }
+
+            StringBuilder bounds = new StringBuilder();
+
+            // #### TOPOLOGICAL ORDER ####
+            int n = nodeMap.size();
             for (Integer nodeId : nodeMap.keySet()) {
                 for (Integer outNodeId : nodeMap.get(nodeId).getOutNodes()) {
                     String constraint = "c" + (counter++) + ": u" + nodeId + " - u" + outNodeId + " + " + n + " x" + nodeId + " >= 1\n";
-                    integers.append("u").append(nodeId).append(" < ").append("u").append(outNodeId).append("\n");
                     bw.write(constraint);
                 }
+                bounds.append("0 <= u").append(nodeId).append(" <= ").append(n).append("\n");
             }
-            bw.write("\nIntegers\n");
-            bw.write(String.valueOf(integers));
-            bw.write("Binary\n");
+
+            // #### EDGE DISJOINT CIRCLES ####
+            /*
+            Deque<Integer> cycle = findBestCycle();
+            while (cycle != null) {
+                StringBuilder constraint = new StringBuilder();
+                constraint.append('c').append(counter++).append(": ");
+                int parent = cycle.pop();
+                int first = parent;
+                constraint.append('x').append(parent).append(" + ");
+                for (Integer nodeId : cycle) {
+                    constraint.append('x').append(nodeId).append(" + ");
+                    removeEdge(nodeId, parent, false);
+                    parent = nodeId;
+                }
+                removeEdge(first, parent);
+                constraint.delete(constraint.length() - 3, constraint.length());
+                constraint.append(" >= 1");
+                bw.write(constraint + "\n");
+                cleanGraph(false);
+                cycle = findBestCycle();
+            }
+             */
+            bw.write("\nBounds\n");
+            bw.write(bounds.substring(0, bounds.length() - 1));
+            bw.write("\nBinary\n");
             bw.write(binaries.substring(0, binaries.length() - 1));
             bw.write("\nEnd");
             bw.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public void createTopoLPFile() {
+        createTopoLPFile("ILPs/" + name + ".lp", null);
+    }
+
+    public void createTopoLPFile(String filename) {
+        createTopoLPFile(filename, null);
+    }
+
+    public void createTopoLPFile(List<Set<Integer>> digraphs) {
+        createTopoLPFile("ILPs/" + name + ".lp", digraphs);
     }
 
 
