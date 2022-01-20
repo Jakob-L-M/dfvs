@@ -5,13 +5,13 @@ public class Packing {
     private final DirectedGraph graph;
     private final List<List<Integer>> mixedStructs;
     private final Set<Integer> safeToDeleteDigraphNodes;
-    public Set<List<Integer>> digraphs;
+    public List<Set<Integer>> digraphs;
     public List<Deque<Integer>> costlySubGraphs;
     public Set<Integer> usedNodes;
 
     Packing(DirectedGraph graph) {
         this.graph = graph;
-        digraphs = new HashSet<>();
+        digraphs = new ArrayList<>();
         safeToDeleteDigraphNodes = new HashSet<>();
         mixedStructs = new ArrayList<>();
         costlySubGraphs = new LinkedList<>();
@@ -43,7 +43,7 @@ public class Packing {
 
     public void safeDeletionDigraph() {
         Set<Integer> safeToDelete = new HashSet<>();
-        for (List<Integer> digraph : digraphs) {
+        for (Set<Integer> digraph : digraphs) {
             int n = digraph.size();
             Set<Integer> deletionCandidates = new HashSet<>();
             for (Integer i : digraph) {
@@ -78,50 +78,28 @@ public class Packing {
         return costlySubGraphs;
     }
 
-    public Set<List<Integer>> getDigraphs() {
+    public List<Set<Integer>> getDigraphs() {
         graph.addStackCheckpoint();
-        Set<List<Integer>> digraphs = new HashSet<>();
+        List<Set<Integer>> digraphs = new ArrayList<>();
         Set<Integer> nodes = graph.nodeMap.keySet();
         while (!graph.nodeMap.isEmpty()) {
             Integer u = nodes.stream().iterator().next();
-            List<Integer> a = expand(u);
-            boolean fullDigraphDeletable = false;
-            /*
-            for (Integer node : nodes) {
-                if (!a.contains(node)) {
-                    int countIn = 0;
-                    int countOut = 0;
-                    for (Integer v :  a) {
-                        if (graph.hasEdge(v, node)) countOut++;
-                        if (graph.hasEdge(node, v)) countIn++;
-                        if (countIn > 0 && countOut > 0) {
-                            break;
-                        }
-                    }
-                    if (countIn > 0 && countOut > 0) {
-                        fullDigraphDeletable = true;
-                        break;
-                    }
-                }
-            }
-            if (fullDigraphDeletable) safeToDeleteDigraphNodes.addAll(a);
-            else {
-                digraphs.add(a);
-            }*/
+            Set<Integer> a = expand(u);
             digraphs.add(a);
             for (Integer i : a) {
                 graph.removeNode(i);
             }
-            nodes.removeAll(a);
+            a.forEach(nodes::remove);
         }
         this.digraphs = digraphs;
         graph.rebuildGraph();
         return digraphs;
     }
 
+    /*
     public List<List<Integer>> getMixedStruct() {
         graph.addStackCheckpoint();
-        Set<List<Integer>> digraphs = new HashSet<>();
+        List<List<Integer>> digraphs = new ArrayList<>();
         Set<Integer> nodes = graph.nodeMap.keySet();
         while (!graph.nodeMap.isEmpty()) {
             Integer u = nodes.stream().iterator().next();
@@ -141,24 +119,24 @@ public class Packing {
         graph.rebuildGraph();
         return mixedStructs;
     }
-
+*/
 
     public int lowerDigraphBound() {
         int lowerBound = 0;
-        for (List<Integer> struct : digraphs) {
+        for (Set<Integer> struct : digraphs) {
             lowerBound += struct.size() - 1;
         }
         return lowerBound;
     }
 
 
-    private List<Integer> expand(Integer start) {
-        List<Integer> digraph = new ArrayList<>();
+    private Set<Integer> expand(Integer start) {
+        Set<Integer> digraph = new HashSet<>();
         digraph.add(start);
         boolean change = true;
         Set<Integer> commonNeighbours = new HashSet<>(graph.nodeMap.get(start).getInNodes());
         while (change) {
-            commonNeighbours.addAll(graph.getNode(digraph.get(0)).getInNodes());
+            commonNeighbours.addAll(graph.getNode(digraph.iterator().next()).getInNodes());
             for (Integer u : digraph) {
                 commonNeighbours.retainAll(graph.getNode(u).getInNodes());
                 commonNeighbours.retainAll(graph.getNode(u).getOutNodes());

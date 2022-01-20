@@ -1,7 +1,4 @@
-import gurobi.GRB;
-import gurobi.GRBEnv;
-import gurobi.GRBException;
-import gurobi.GRBModel;
+import gurobi.*;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -18,8 +15,9 @@ public class Main {
     public static long flowerTime;
     public static long digraphTime;
     public static int firstLowerbound;
-    public static Set<List<Integer>> fullDigraphs;
+    public static List<Set<Integer>> fullDigraphs;
     public static Map<String, Integer> solSizes;
+    public static Map<String, Integer> solSizes3;
     public static Map<String, List<Double>> timeMap;
     public static Map<String, List<Integer>> recMap;
     public static GRBEnv env;
@@ -134,8 +132,8 @@ public class Main {
             return null;
         }
 
-        Set<List<Integer>> remainingDigraphs = graph.cleanDigraphSet(fullDigraphs);
-        List<Integer> digraph = null;
+        List<Set<Integer>> remainingDigraphs = graph.cleanDigraphSet(fullDigraphs);
+        Set<Integer> digraph = null;
         if (!remainingDigraphs.isEmpty()) {
             digraph = remainingDigraphs.iterator().next();
         }
@@ -305,7 +303,8 @@ public class Main {
         recursions = 0;
     }
 
-    public static void productionMain(String args) {
+    public static void productionMain(String args) throws GRBException {
+        /*
         petalK = 4;
         petalRec = 16;
         costRec = 49;
@@ -320,32 +319,60 @@ public class Main {
             System.out.println(i);
         }
         System.out.println("#recursive steps: " + recursions);
+         */
+        // timelimit in seconds for gurobi
+        //double timelimit = 180.0;
+        System.out.print("# ");
+        env = new GRBEnv();
+        env.set(GRB.IntParam.OutputFlag, 0);
+        //env.set(GRB.DoubleParam.TimeLimit, timelimit);
+        env.start();
+
+        DirectedGraph graph = new DirectedGraph(args);
+        //DirectedGraph graph = new DirectedGraph("instances/complex/health-n_100");
+
+        Set<Integer> cleanedNodes = graph.rootClean();
+        int kClean = cleanedNodes.size();
+
+        int k = 0;
+        if (graph.nodeMap.size() > 0) {
+            graph.createTopoLPFile("temp.lp");
+            k = ilp("temp.lp", Double.MAX_VALUE);
+        }
+        for (int i = 0; i < k + kClean; i++) {
+            System.out.println(k + kClean);
+        }
     }
 
     public static void main(String[] args) throws IOException, GRBException {
 
-        // timelimit in seconds for gurobi
-        double timelimit = 180.0;
 
+        solSizes = utils.loadSolSizes();
+        solSizes3 = utils.loadSolSizes3();
+
+        System.out.print("# ");
+        double timelimit = 180.0;
         env = new GRBEnv();
         env.set(GRB.IntParam.OutputFlag, 0);
         env.set(GRB.DoubleParam.TimeLimit, timelimit);
         env.start();
 
-        solSizes = utils.loadSolSizes();
-        Map<String, Integer> solSizes3 = utils.loadSolSizes3();
+        runILP("instances/week3_no_timeout.txt", timelimit);
+    }
 
-        BufferedReader br = new BufferedReader(new FileReader("instances/week3_no_timeout.txt"));
+    private static void runILP(String file, double timelimit) throws IOException, GRBException {
+        BufferedReader br = new BufferedReader(new FileReader(file));
         String instance = br.readLine();
 
-        System.out.println("instance,k,fileTime,totalTime");
+        System.out.println("instance,k,fileTime,cleanTime,digraphTime,totalTime");
 
         while (instance != null) {
             instance = instance.split("\t")[0];
+            //instance = "./instances/complex/GD-n_62-m_287.mtx";
             long time = -System.nanoTime();
 
-            String name = instance.substring(instance.indexOf("instances/") + 10);
-            name = name.substring(0, name.indexOf("/"));
+            String instanceName = instance.substring(instance.indexOf("instances/") + 10);
+            String name = instanceName.substring(0, instanceName.indexOf("/"));
             int optk;
             if (name.contains("3")) {
                 optk = solSizes3.get(instance.substring(instance.lastIndexOf("/") + 1));
@@ -355,26 +382,45 @@ public class Main {
 
             DirectedGraph graph = new DirectedGraph(instance);
             System.out.print(instance);
+
+            long cleanTime = -System.nanoTime();
+            Set<Integer> cleanedNodes = graph.rootClean();
+            double cleanSec = utils.round((cleanTime + System.nanoTime()) / 1_000_000_000.0, 4);
+
+            long digraphTime = -System.nanoTime();
+            Packing packing = new Packing(graph);
+
+            List<Set<Integer>> digraphs =  packing.getDigraphs();
+            Set<Integer> safeToDeleteDigraph = packing.getSafeToDeleteDigraphNodes();
+
+            cleanedNodes.addAll(safeToDeleteDigraph);
+            graph.removeAllNodes(safeToDeleteDigraph);
+
+            digraphs = graph.cleanDigraphSet(digraphs);
+
+            double digraphSec = utils.round((digraphTime + System.nanoTime()) / 1_000_000_000.0, 4);
+
             long fileTime = -System.nanoTime();
 
+            int kClean = cleanedNodes.size();
             int k = 0;
             double fileSec = 0.0;
             if (graph.nodeMap.size() > 0) {
-                graph.createTopoLPFile();
+                graph.createTopoLPFile(digraphs);
                 fileSec = utils.round((fileTime + System.nanoTime()) / 1_000_000_000.0, 4);
 
-                k = ilp("topoLp/" + instance.substring(instance.indexOf("instances/") + 10), timelimit);
+                k = ilp("ILPs/" + instanceName, timelimit);
             }
             if (k == -1) {
-                System.out.println(",-1," + fileSec + "," + timelimit);
+                System.out.println(",-1," + fileSec + "," + cleanSec + "," + digraphSec + "," + timelimit);
             } else {
 
-                if (optk != k) {
-                    System.err.print(" ! Incorrect Solution ! ");
+                if (optk != k + kClean) {
+                    System.err.print(" ! Incorrect Solution ! " + (k + kClean) + " Correct: " + optk);
                 }
 
                 double sec = utils.round((time + System.nanoTime()) / 1_000_000_000.0, 4);
-                System.out.println("," + k + "," + fileSec + "," + sec);
+                System.out.println("," + (k + kClean) + "," + fileSec + "," + cleanSec + "," + digraphSec + "," + sec);
             }
             instance = br.readLine();
             //break;
@@ -398,8 +444,16 @@ public class Main {
             }
 
             if (optimstatus == GRB.Status.OPTIMAL) {
-                double objval = model.get(GRB.DoubleAttr.ObjVal);
-                return (int) Math.round(objval);
+
+                // Printing Opt Vars:
+                /*
+                for (GRBVar var : model.getVars()) {
+                    System.out.println(var.get(GRB.StringAttr.VarName) + ": " + var.get(GRB.DoubleAttr.X));
+                }
+                */
+
+                double objVal = model.get(GRB.DoubleAttr.ObjVal);
+                return (int) Math.round(objVal);
             } else if (optimstatus == GRB.Status.INFEASIBLE) {
                 System.out.println("Model is infeasible");
                 model.computeIIS();

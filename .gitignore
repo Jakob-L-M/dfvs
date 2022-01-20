@@ -32,3 +32,4 @@ src/META-INF/MANIFEST.MF
 .project
 *.ipynb
 *.png
+*.lp
