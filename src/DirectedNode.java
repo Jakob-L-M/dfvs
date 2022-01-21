@@ -90,6 +90,28 @@ public class DirectedNode {
         return -1;
     }
 
+    /**
+     * Number of bi-directional edges is equivalent to the number of connected twoCycles
+     * @return number of connected bi-directional edges
+     */
+    public int biDirectionalCount() {
+        int biDirectionalCount = 0;
+        if (outNodes.size() < inNodes.size()) {
+            for (Integer outNode : outNodes) {
+                if (inNodes.contains(outNode)) {
+                    biDirectionalCount++;
+                }
+            }
+        } else {
+            for (Integer inNode : inNodes) {
+                if (outNodes.contains(inNode)) {
+                    biDirectionalCount++;
+                }
+            }
+        }
+        return biDirectionalCount;
+    }
+
     public int getInDegree() {
         return inNodes.size();
     }

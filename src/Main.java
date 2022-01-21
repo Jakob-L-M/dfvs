@@ -304,60 +304,80 @@ public class Main {
     }
 
     public static void productionMain(String args) throws GRBException {
-        /*
-        petalK = 4;
-        petalRec = 16;
-        costRec = 49;
-        costK = 9;
-        petalEnabled = true;
-        costEnabled = true;
-
         DirectedGraph graph = new DirectedGraph(args);
-        Set<Integer> solution = dfvsSolve(graph);
-        assert solution != null;
-        for (int i : solution) {
-            System.out.println(i);
-        }
-        System.out.println("#recursive steps: " + recursions);
-         */
-        // timelimit in seconds for gurobi
-        //double timelimit = 180.0;
-        System.out.print("# ");
-        env = new GRBEnv();
-        env.set(GRB.IntParam.OutputFlag, 0);
-        //env.set(GRB.DoubleParam.TimeLimit, timelimit);
-        env.start();
-
-        DirectedGraph graph = new DirectedGraph(args);
-        //DirectedGraph graph = new DirectedGraph("instances/complex/health-n_100");
 
         Set<Integer> cleanedNodes = graph.rootClean();
-        int kClean = cleanedNodes.size();
 
-        int k = 0;
+        Packing packing = new Packing(graph);
+
+        List<Set<Integer>> digraphs =  packing.getDigraphs();
+        Set<Integer> safeToDeleteDigraph = packing.getSafeToDeleteDigraphNodes();
+
+        cleanedNodes.addAll(safeToDeleteDigraph);
+        graph.removeAllNodes(safeToDeleteDigraph);
+
+        cleanedNodes.addAll(graph.rootClean());
+
+        digraphs = graph.cleanDigraphSet(digraphs);
+
+        List<String> k = new ArrayList<>();
         if (graph.nodeMap.size() > 0) {
-            graph.createTopoLPFile("temp.lp");
-            k = ilp("temp.lp", Double.MAX_VALUE);
+            String filename = "./" + args.substring(args.lastIndexOf('/') + 1) + ".lp";
+            graph.createTopoLPFile(filename, digraphs);
+            k = ilp(filename, Double.MAX_VALUE);
         }
-        for (int i = 0; i < k + kClean; i++) {
-            System.out.println(k + kClean);
+        if (k != null) {
+            for (String s : k) {
+                System.out.println(s);
+            }
+            for (Integer i: cleanedNodes) {
+                System.out.println(i);
+            }
         }
     }
 
     public static void main(String[] args) throws IOException, GRBException {
 
-
-        solSizes = utils.loadSolSizes();
-        solSizes3 = utils.loadSolSizes3();
-
         System.out.print("# ");
-        double timelimit = 180.0;
+
         env = new GRBEnv();
         env.set(GRB.IntParam.OutputFlag, 0);
-        env.set(GRB.DoubleParam.TimeLimit, timelimit);
+
+
         env.start();
 
-        runILP("instances/week3_no_timeout.txt", timelimit);
+        productionMain(args[0]);
+
+
+        // #### DEVELOP ONLY ####
+        /*
+        solSizes = utils.loadSolSizes();
+        solSizes3 = utils.loadSolSizes3();
+        double timelimit = 180.0;
+        env.set(GRB.DoubleParam.TimeLimit, timelimit);
+
+        // #### VALIDATE INSTANCES ####
+        String instanceFile = "instances/all_instances.txt";
+        BufferedReader br = new BufferedReader(new FileReader(instanceFile));
+        String instance = br.readLine();
+        while (instance != null) {
+            File file = new File(instance);
+            if (!file.isFile()) {
+                System.out.println(instance);
+                return;
+            }
+            instance = br.readLine();
+        }
+
+        System.out.println("Validation passed");
+
+        runILP(instanceFile, timelimit);
+        // #### VALIDATE INSTANCES ####
+
+        // #### DEVELOP ONLY ####
+
+
+         */
     }
 
     private static void runILP(String file, double timelimit) throws IOException, GRBException {
@@ -365,10 +385,18 @@ public class Main {
         String instance = br.readLine();
 
         System.out.println("instance,k,fileTime,cleanTime,digraphTime,totalTime");
-
+        boolean skip = true;
         while (instance != null) {
             instance = instance.split("\t")[0];
-            //instance = "./instances/complex/GD-n_62-m_287.mtx";
+
+            if(instance.contains("synth-n_3500-m_1304726-k_150-p_0.2.txt")) skip = false; //checkpoint
+
+            if (skip) {
+                instance = br.readLine();
+                continue;
+            }
+
+            //instance = "./instances/synthetic/synth-n_120-m_1600-k_8-p_0.2.txt";
             long time = -System.nanoTime();
 
             String instanceName = instance.substring(instance.indexOf("instances/") + 10);
@@ -398,36 +426,48 @@ public class Main {
 
             digraphs = graph.cleanDigraphSet(digraphs);
 
+            cleanedNodes.addAll(graph.rootClean());
+
             double digraphSec = utils.round((digraphTime + System.nanoTime()) / 1_000_000_000.0, 4);
 
             long fileTime = -System.nanoTime();
 
             int kClean = cleanedNodes.size();
-            int k = 0;
+            List<String> k = new ArrayList<>();
             double fileSec = 0.0;
             if (graph.nodeMap.size() > 0) {
                 graph.createTopoLPFile(digraphs);
                 fileSec = utils.round((fileTime + System.nanoTime()) / 1_000_000_000.0, 4);
 
-                k = ilp("ILPs/" + instanceName, timelimit);
+                k = ilp("ILPs/" + instanceName, Math.max(0.001, timelimit - fileSec - digraphSec));
             }
-            if (k == -1) {
+            if (k == null) {
+                if(optk == -1) {
+                    // Yellow: a timeout that also has no known solution
+                    System.out.print("\u001B[33m !both Timeouts! \u001B[0m");
+                }
                 System.out.println(",-1," + fileSec + "," + cleanSec + "," + digraphSec + "," + timelimit);
             } else {
 
-                if (optk != k + kClean) {
-                    System.err.print(" ! Incorrect Solution ! " + (k + kClean) + " Correct: " + optk);
+                if ( optk == -1) {
+                    // Green: a Solution with no known optimal Solution.
+                    System.out.print("\u001B[32m !Solution unkown! \u001B[0m");
+                }
+
+                else if (optk != k.size() + kClean) {
+                    // Red: an incorrect Solution
+                    System.out.print("\u001B[31m !Incorrect Solution! \u001B[0m");
                 }
 
                 double sec = utils.round((time + System.nanoTime()) / 1_000_000_000.0, 4);
-                System.out.println("," + (k + kClean) + "," + fileSec + "," + cleanSec + "," + digraphSec + "," + sec);
+                System.out.println("," + (k.size() + kClean) + "," + fileSec + "," + cleanSec + "," + digraphSec + "," + sec);
             }
             instance = br.readLine();
             //break;
         }
     }
 
-    private static int ilp(String file, double timelimit) {
+    private static List<String> ilp(String file, double timelimit) {
 
         try {
             GRBModel model = new GRBModel(env, file);
@@ -444,16 +484,13 @@ public class Main {
             }
 
             if (optimstatus == GRB.Status.OPTIMAL) {
-
-                // Printing Opt Vars:
-                /*
+                List<String> res = new ArrayList<>();
                 for (GRBVar var : model.getVars()) {
-                    System.out.println(var.get(GRB.StringAttr.VarName) + ": " + var.get(GRB.DoubleAttr.X));
+                    if (var.get(GRB.DoubleAttr.X) > 0.9 && var.get(GRB.StringAttr.VarName).contains("x")) {
+                        res.add(var.get(GRB.StringAttr.VarName).substring(1));
+                    }
                 }
-                */
-
-                double objVal = model.get(GRB.DoubleAttr.ObjVal);
-                return (int) Math.round(objVal);
+                return res;
             } else if (optimstatus == GRB.Status.INFEASIBLE) {
                 System.out.println("Model is infeasible");
                 model.computeIIS();
@@ -461,20 +498,19 @@ public class Main {
             } else if (optimstatus == GRB.Status.UNBOUNDED) {
                 System.out.println("Model is unbounded");
             } else if (optimstatus == GRB.Status.TIME_LIMIT) {
-                return -1;
+                return null;
             }
             else {
                 System.out.println("Optimization was stopped with status = "
                         + optimstatus);
             }
             model.dispose();
-            env.dispose();
 
         } catch (GRBException e) {
             System.out.println("Error code: " + e.getErrorCode() + ". " +
                     e.getMessage());
         }
-        return -1;
+        return null;
     }
 
     private static void parameterOptimization() {

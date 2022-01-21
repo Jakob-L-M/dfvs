@@ -165,6 +165,25 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 continue;
             }
 
+            if (node.getInDegree() != node.getOutDegree() && Math.min(node.getInDegree(), node.getOutDegree()) == node.biDirectionalCount()) {
+                Set<Integer> inNodes = new HashSet<>(node.getInNodes());
+                Set<Integer> outNodes = new HashSet<>(node.getOutNodes());
+                if (outNodes.size() > inNodes.size()) {
+                    for (Integer outNode : outNodes) {
+                        if (!inNodes.contains(outNode)) {
+                            removeEdge(nodeId, outNode, false);
+                        }
+                    }
+                } else {
+                    for (Integer inNode : inNodes) {
+                        if (!outNodes.contains(inNode)) {
+                            removeEdge(inNode, nodeId, false);
+                        }
+                    }
+                }
+                change = true;
+            }
+
             // clean semi pendant triangle
             Set<Integer> triangle = cleanSemiPendantTriangle(nodeId);
             if (triangle != null) {
@@ -334,7 +353,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             if (stack) {
                 this.stack.push(new StackTuple(false, preID, postID));
             }
-            return nodeMap.get(preID).removeOutNode(postID) && nodeMap.get(postID).removeInNode(preID);
+            return nodeMap.get(preID).removeOutNode(postID) & nodeMap.get(postID).removeInNode(preID);
         }
         return false;
     }
@@ -725,7 +744,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
      * Files is stored in ILPs/[complex(3) or synthetic(3)/name.lp].
      * Make sure the folders ILPs/complex, ILPs/synthetic, ILPs/complex3 and ILPs/synthetic3 exist.
      */
-    public void createTopoLPFile(String filename, List<Set<Integer>> digraphs) {
+    public long createTopoLPFile(String filename, List<Set<Integer>> digraphs) {
 
         try {
             BufferedWriter bw = new BufferedWriter(new FileWriter(filename));
@@ -773,9 +792,9 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             }
 
             // #### EDGE DISJOINT CIRCLES ####
-            /*
             Deque<Integer> cycle = findBestCycle();
-            while (cycle != null) {
+            long cycleTime = -System.nanoTime();
+            while (cycle != null && cycleTime + System.nanoTime() < 20_000_000_000L) {
                 StringBuilder constraint = new StringBuilder();
                 constraint.append('c').append(counter++).append(": ");
                 int parent = cycle.pop();
@@ -793,28 +812,30 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 cleanGraph(false);
                 cycle = findBestCycle();
             }
-             */
+
             bw.write("\nBounds\n");
             bw.write(bounds.substring(0, bounds.length() - 1));
             bw.write("\nBinary\n");
             bw.write(binaries.substring(0, binaries.length() - 1));
             bw.write("\nEnd");
             bw.close();
+
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return 0L;
     }
 
-    public void createTopoLPFile() {
-        createTopoLPFile("ILPs/" + name + ".lp", null);
+    public long createTopoLPFile() {
+        return createTopoLPFile("ILPs/" + name + ".lp", null);
     }
 
-    public void createTopoLPFile(String filename) {
-        createTopoLPFile(filename, null);
+    public long createTopoLPFile(String filename) {
+        return createTopoLPFile(filename, null);
     }
 
-    public void createTopoLPFile(List<Set<Integer>> digraphs) {
-        createTopoLPFile("ILPs/" + name + ".lp", digraphs);
+    public long createTopoLPFile(List<Set<Integer>> digraphs) {
+        return createTopoLPFile("ILPs/" + name + ".lp", digraphs);
     }
 
 

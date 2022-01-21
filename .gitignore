@@ -33,3 +33,5 @@ src/META-INF/MANIFEST.MF
 *.ipynb
 *.png
 *.lp
+*.json
+*.pdf
