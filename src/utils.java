@@ -1,8 +1,5 @@
 import java.io.*;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class utils {
 
@@ -80,6 +77,43 @@ public class utils {
             e.printStackTrace();
         }
         return res;
+    }
+
+    public static Model loadMatrix(String path) {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(path));
+            String line = br.readLine();
+            List<List<Double>> currentMatrix = new ArrayList<>();
+            List<List<List<Double>>> weights = new ArrayList<>();
+            List<List<Double>> biases = new ArrayList<>();
+            boolean inMatrix = false;
+            while (line != null) {
+                if (line.length() <= 1) {
+                    inMatrix = !inMatrix;
+                    if (!inMatrix) {
+                        weights.add(currentMatrix);
+                        currentMatrix = new ArrayList<>();
+                    }
+                    line = br.readLine();
+                    continue;
+                }
+                String[] splits = line.split(", ");
+                List<Double> row = new ArrayList<>();
+                for (String s : splits) {
+                    row.add(Double.valueOf(s));
+                }
+                if (inMatrix) {
+                    currentMatrix.add(row);
+                } else {
+                    biases.add(row);
+                }
+                line = br.readLine();
+            }
+            return new Model(weights, biases, 0.1);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
 }
