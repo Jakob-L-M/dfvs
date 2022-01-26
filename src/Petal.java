@@ -2,7 +2,7 @@ import java.util.*;
 
 public class Petal {
 
-    public static Tuple getPetalSet(DirectedGraph graph, int nodeId) {
+    public static Tuple getPetalSet(DirectedGraph graph, int nodeId, int limit) {
         graph.addNode(-1); //source
         graph.addNode(-2); //sink
 
@@ -28,7 +28,7 @@ public class Petal {
 
         int max_flow = 0;
 
-        while (bfs(rGraph, parent)) {
+        while (bfs(rGraph, parent, limit)) {
             int cur = parent.get(-2);
             while (cur != -1) {
                 rGraph.remove(cur);
@@ -58,7 +58,7 @@ public class Petal {
         return new Tuple(max_flow, petalSet);
     }
 
-    private static boolean bfs(Map<Integer, Set<Integer>> rGraph, Map<Integer, Integer> parent) {
+    private static boolean bfs(Map<Integer, Set<Integer>> rGraph, Map<Integer, Integer> parent, int limit) {
         Set<Integer> visited = new HashSet<>();
         Queue<Integer> queue = new LinkedList<>();
 
@@ -76,12 +76,27 @@ public class Petal {
                         if (outNode == -2) {
                             return true;
                         }
-                        queue.add(outNode);
                         visited.add(outNode);
+
+                        // limit flower size
+                        if (limitParentDepth(outNode, parent,limit)) {
+                            queue.add(outNode);
+                        }
                     }
                 }
             }
         }
         return visited.contains(-2);
+    }
+
+    private static boolean limitParentDepth(int nodeId, Map<Integer, Integer> parent, int limit) {
+        int c = 1;
+        int cur = parent.get(nodeId);
+        while (cur != -1) {
+            c++;
+            cur = parent.get(cur);
+            if (c >= limit) return false;
+        }
+        return true;
     }
 }
