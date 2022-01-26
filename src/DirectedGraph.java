@@ -256,8 +256,12 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
      * @return Tuple. Tuple.value() gives the max-flow, Tuple.set() is a set of all nodes
      * present in any flower leave or the flower center itself.
      */
+    public Tuple calculatePetal(int nodeId, int limit) {
+        return Petal.getPetalSet(this, nodeId, limit);
+    }
+
     public Tuple calculatePetal(int nodeId) {
-        return Petal.getPetalSet(this, nodeId);
+        return Petal.getPetalSet(this, nodeId, Integer.MAX_VALUE);
     }
 
     /**
@@ -836,6 +840,124 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
     public long createTopoLPFile(List<Set<Integer>> digraphs) {
         return createTopoLPFile("ILPs/" + name + ".lp", digraphs);
+    }
+
+    public String extractGraphMetaData() {
+        int n = nodeMap.size();
+        int m = 0;
+        int maxIn = 0;
+        int maxOut = 0;
+        int minIn = Integer.MAX_VALUE;
+        int minOut = Integer.MAX_VALUE;
+        int minPetal = Integer.MAX_VALUE;
+        int maxPetal = 0;
+        List<Integer> petals = new ArrayList<>();
+        List<Integer> inDegrees = new ArrayList<>();
+        List<Integer> outDegrees = new ArrayList<>();
+        for (DirectedNode node : new HashSet<>(nodeMap.values())) {
+            m += node.getOutDegree();
+
+            inDegrees.add(node.getInDegree());
+            if (node.getInDegree() > maxIn) {
+                maxIn = node.getInDegree();
+            }
+            if (node.getInDegree() < minIn) {
+                minIn = node.getInDegree();
+            }
+
+            outDegrees.add(node.getOutDegree());
+            if (node.getOutDegree() > maxOut) {
+                maxOut = node.getOutDegree();
+            }
+            if (node.getOutDegree() < minOut) {
+                minOut = node.getOutDegree();
+            }
+
+            if (n <= 100 || node.getNodeID() % (n / 50) == 0) {
+                int petal = calculatePetal(node.getNodeID(), 3).getValue();
+
+                if (petal > maxPetal) {
+                    maxPetal = petal;
+                }
+                if (petal < minPetal) {
+                    minPetal = petal;
+                }
+                petals.add(petal);
+            }
+
+        }
+        Collections.sort(inDegrees);
+        Collections.sort(outDegrees);
+        Collections.sort(petals);
+
+        int inLowerQ = inDegrees.get(n / 4);
+        int inMed = inDegrees.get(n / 2);
+        int inUpperQ = inDegrees.get(3 * n / 4);
+
+        int outLowerQ = outDegrees.get(n / 4);
+        int outMed = outDegrees.get(n / 2);
+        int outUpperQ = outDegrees.get(3 * n / 4);
+
+        int pLowerQ = petals.get(petals.size() / 4);
+        int pMed = petals.get(petals.size() / 2);
+        int pUpperQ = petals.get(3 * petals.size() / 4);
+
+        return "" + n + "," + m + "," + maxIn + "," + maxOut + ","
+                + minIn + "," + minOut + "," + inLowerQ + "," + inMed + "," + inUpperQ
+                + "," + outLowerQ + "," + outMed + "," + outUpperQ
+                + "," + maxPetal + "," + minPetal + "," + pLowerQ
+                + "," + pMed + "," + pUpperQ;
+    }
+
+    public void extractNodeMetaData(BufferedWriter bw) throws IOException {
+        String instance = name;
+        int n = nodeMap.size();
+        int week;
+        if (instance.substring(0, instance.lastIndexOf('/')).contains("3")) {
+            week = 3;
+        } else {
+            week = 2;
+        }
+
+        for (DirectedNode node : new HashSet<>(nodeMap.values())) {
+            int id = node.getNodeID();
+            double inDegree = utils.round((double) node.getInDegree() / n, 6);
+            double outDegree = utils.round((double) node.getOutDegree() / n, 6);
+
+            double maxInOut = Math.max(inDegree, outDegree);
+            double minInOut = Math.min(inDegree, outDegree);
+
+
+            double petal3 = utils.round((double)calculatePetal(id, 3).getValue()/n, 6);
+            double petal5 = utils.round((double)calculatePetal(id, 5).getValue()/n, 6);
+
+            int inInNodes = 0;
+            for (Integer inNode : node.getInNodes()) {
+                inInNodes += nodeMap.get(inNode).getInDegree();
+            }
+            double inInDegree = utils.round((double) inInNodes / n, 6);
+
+
+            int outOutNodes = 0;
+            for (Integer outNode : node.getOutNodes()) {
+                outOutNodes += nodeMap.get(outNode).getOutDegree();
+            }
+            double outOutDegree = utils.round((double) outOutNodes / n, 6);
+
+            int biDirectionalEdges = node.biDirectionalCount();
+
+            int nonBiInNodes = node.getInDegree() - biDirectionalEdges;
+            int nonBiOutNodes = node.getInDegree() - biDirectionalEdges;
+
+            double biDirectionalDegree = utils.round((double) biDirectionalEdges / n, 6);
+            double noBiInDegree = utils.round((double) nonBiInNodes / n, 6);
+            double noBiOutDegree = utils.round((double) nonBiOutNodes / n, 6);
+
+            bw.write(instance + "," + week + "," + id + "," + inDegree + "," + outDegree + "," + maxInOut + "," +
+                    minInOut + "," + inInDegree + "," + outOutDegree + "," + biDirectionalDegree + "," +
+                    noBiInDegree + "," + noBiOutDegree + "," + petal3 + "," + petal5 + "\n");
+
+        }
     }
 
 
