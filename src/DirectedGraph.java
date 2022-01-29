@@ -49,6 +49,53 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return cleanGraph(true);
     }
 
+    public int deathByPacking() {
+        int heurK = cleanSelfCyclesInit().size();
+        //Set<Integer> delete = cleanGraph();
+        //if (delete != null) heurK += delete.size();
+        heurK += rootClean().size();
+        Packing pack = new Packing(this);
+        List<Deque<Integer>> remove = pack.findCyclePacking();
+        while(!remove.isEmpty()) {
+            int count = 0;
+            for (Deque<Integer> circle : remove) {
+                removeNode(circle.peek());
+                count++;
+            }
+            heurK += count;
+            System.out.println("added " + count);
+            heurK += rootClean().size();
+            remove = pack.findCyclePacking();
+        }
+        return heurK;
+    }
+
+    public Set<Integer> cleanSinkAndSources() {
+        Set<Integer> deleteSet = new HashSet<>();
+        boolean change = true;
+        while (change) {
+            change = false;
+            for (DirectedNode node : nodeMap.values()) {
+                if (node.isSinkSource()) {
+                    deleteSet.add(node.getNodeID());
+                    change = true;
+                }
+            }
+            removeAllNodes(deleteSet);
+            deleteSet = new HashSet<>();
+        }
+        return deleteSet;
+    }
+
+    public Set<Integer> cleanSelfCyclesInit() {
+        Set<Integer> self = new HashSet<>();
+        for (DirectedNode node : nodeMap.values()) {
+            if (node.getOutNodes().contains(node.getNodeID())) self.add(node.getNodeID());
+        }
+        removeAllNodes(self);
+        return self;
+    }
+
     public Set<Integer> cleanGraph(boolean costlyDeletions) {
 
         Set<Integer> nodes = new HashSet<>(nodeMap.keySet());

@@ -1,4 +1,7 @@
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
 
 public class Packing {
@@ -19,26 +22,43 @@ public class Packing {
     }
 
     public static void main(String[] args) {
-        /*Packing packing = new Packing(new DirectedGraph("instances/complex/usairport-n_800"));
-        List<Deque<Integer>> pack = packing.findCyclePacking();
-        System.out.println(pack);
-        System.out.println(pack.size());
-        packing.swapOne(pack);
-        for (int i = 0; i < pack.size(); i++) {
-            packing.costlySubGraphs.remove(0);
+        DirectedGraph g = new DirectedGraph("instances/sheet5-heuristic/e_077.new");
+        System.out.println(Main.dfvsSolve(g).size());
+        //System.out.println("clean: " + g.cleanSelfCyclesInit().size());
+        Packing pack = new Packing(g);
+        List<Deque<Integer>> remove = pack.findCyclePacking();
+        while(!remove.isEmpty()) {
+            int count = 0;
+            for (Deque<Integer> circle : remove) {
+                g.removeNode(circle.peek());
+                count++;
+            }
+            System.out.println("pack remove: " + count);
+            remove = pack.findCyclePacking();
         }
-        System.out.println(packing.costlySubGraphs);
-        System.out.println(packing.costlySubGraphs.size());
-        int newSize = packing.costlySubGraphs.size();
-        packing.swapOne(packing.costlySubGraphs);
-        System.out.println(packing.costlySubGraphs);
-        System.out.println(packing.costlySubGraphs.size());
-         */
-        File complexInst = new File("instances/complex");
-        for (File inst : complexInst.listFiles()) {
-            Packing packing = new Packing(new DirectedGraph(inst.getPath()));
-            System.out.println(packing.getFourCycles());
+
+        try {
+            BufferedWriter writer = new BufferedWriter(new FileWriter("packingTimes.txt", true));
+            writer.write("name heurK\n");
+            File instances = new File("instances");
+            for (File subInst : instances.listFiles()) {
+                if (!subInst.getName().contains("synthetic3") || !subInst.isDirectory()) continue;
+                int count = 0;
+                for (File instance : subInst.listFiles()) {
+                    DirectedGraph graph = new DirectedGraph(instance.getPath());
+                    writer.write(instance.getName() + " " + graph.deathByPacking() + "\n");
+                    System.out.println("done");
+                    //if (count > 100) break;
+                    System.out.println("count: " + count++);
+                }
+            }
+            writer.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+
+
+
     }
 
     public void safeDeletionDigraph() {
