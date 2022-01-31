@@ -22,43 +22,58 @@ public class Packing {
     }
 
     public static void main(String[] args) {
-        DirectedGraph g = new DirectedGraph("instances/sheet5-heuristic/e_077.new");
-        System.out.println(Main.dfvsSolve(g).size());
-        //System.out.println("clean: " + g.cleanSelfCyclesInit().size());
-        Packing pack = new Packing(g);
-        List<Deque<Integer>> remove = pack.findCyclePacking();
-        while(!remove.isEmpty()) {
-            int count = 0;
-            for (Deque<Integer> circle : remove) {
-                g.removeNode(circle.peek());
-                count++;
-            }
-            System.out.println("pack remove: " + count);
-            remove = pack.findCyclePacking();
-        }
-
-        try {
-            BufferedWriter writer = new BufferedWriter(new FileWriter("packingTimes.txt", true));
-            writer.write("name heurK\n");
-            File instances = new File("instances");
-            for (File subInst : instances.listFiles()) {
-                if (!subInst.getName().contains("synthetic3") || !subInst.isDirectory()) continue;
-                int count = 0;
-                for (File instance : subInst.listFiles()) {
-                    DirectedGraph graph = new DirectedGraph(instance.getPath());
-                    writer.write(instance.getName() + " " + graph.deathByPacking() + "\n");
-                    System.out.println("done");
-                    //if (count > 100) break;
-                    System.out.println("count: " + count++);
+        //DirectedGraph g = new DirectedGraph("instances/h_001", true);
+        //System.out.println(g.size());
+        //System.out.println(Main.dfvsSolve(g));
+        if (true) {
+            try {
+                BufferedWriter writer = new BufferedWriter(new FileWriter("packingTimesTwoPackings.txt", true));
+                writer.write("name heurK\n");
+                File instances = new File("instances");
+                for (File subInst : instances.listFiles()) {
+                    if (subInst.getName().contains("sheet5") || !subInst.isDirectory()) continue;
+                    int count = 0;
+                    for (File instance : subInst.listFiles()) {
+                        int runs = 1;
+                        int best_heur = Integer.MAX_VALUE;
+                        int[] all_heurs = new int[runs];
+                        for (int i = 0; i < runs; i++) {
+                            DirectedGraph graph = new DirectedGraph(instance.getPath());
+                            int sol = graph.deathByPacking();
+                            all_heurs[i] = sol;
+                            if (sol < best_heur) best_heur = sol;
+                        }
+                        writer.write(instance.getName() + " " + best_heur + "\n");// + " out of " + Arrays.toString(all_heurs) + "\n");
+                        System.out.println("done");
+                        //if (count > 100) break;
+                        System.out.println("count: " + count++);
+                    }
                 }
+                writer.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            writer.close();
-        } catch (IOException e) {
-            e.printStackTrace();
         }
-
-
-
+        else {
+            try {
+                long time = - System.nanoTime();
+                BufferedWriter writer = new BufferedWriter(new FileWriter("packingTimesSinglePacking.txt", true));
+                int runs = 1;
+                int best_heur = Integer.MAX_VALUE;
+                int[] all_heurs = new int[runs];
+                for (int i = 0; i < runs; i++) {
+                    DirectedGraph graph = new DirectedGraph(args[0]);
+                    int sol = graph.deathByPacking();
+                    all_heurs[i] = sol;
+                    if (sol < best_heur) best_heur = sol;
+                }
+                time += System.nanoTime();
+                writer.write(args[0] + " " + best_heur + " out of " + Arrays.toString(all_heurs) + "\n");
+                writer.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     public void safeDeletionDigraph() {

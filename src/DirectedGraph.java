@@ -13,6 +13,29 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     int k;
     Stack<Integer> solution = new Stack<>();
 
+    DirectedGraph(String fileName, boolean paceInst) {
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader(fileName));
+            String currentLine = reader.readLine();
+            for (int i = 1; i <= Integer.parseInt(currentLine.split(" ")[0]); i++) {
+                dict.put(Integer.toString(i), i);
+                addNode(i);
+            }
+            int count = 1;
+            while ((currentLine = reader.readLine()) != null) {
+                if (currentLine.contains("#") || currentLine.contains("%") || currentLine.isEmpty()) continue;
+                String[] nodes = currentLine.split(" ");
+                for (String v : nodes) {
+                    addEdge(count, Integer.parseInt(v));
+                }
+                count++;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        name = fileName.substring(fileName.indexOf("instances/") + 10);
+    }
+
     DirectedGraph(String fileName) {
         try {
             BufferedReader reader = new BufferedReader(new FileReader(fileName));
@@ -56,16 +79,35 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         heurK += rootClean().size();
         Packing pack = new Packing(this);
         List<Deque<Integer>> remove = pack.findCyclePacking();
+        int level = 0;
         while(!remove.isEmpty()) {
+            if (level > 2) {
+                Tarjan tarjan = new Tarjan(this);
+                Set<DirectedGraph> sccs = tarjan.getSCCGraphs();
+                if (sccs.size() > 10) {
+                    for (DirectedGraph scc : sccs) {
+                        heurK += Main.dfvsSolve(scc).size();
+                    }
+                    return heurK;
+                }
+            }
             int count = 0;
             for (Deque<Integer> circle : remove) {
-                removeNode(circle.peek());
+                int nodeToDelete = circle.pop();
+                for (Integer v : circle) {
+                    if (nodeMap.get(v).getOutDegree() * nodeMap.get(v).getInDegree()
+                        > nodeMap.get(nodeToDelete).getOutDegree() * nodeMap.get(nodeToDelete).getInDegree()) {
+                        nodeToDelete = v;
+                    }
+                }
+                removeNode(nodeToDelete);
                 count++;
             }
             heurK += count;
             System.out.println("added " + count);
             heurK += rootClean().size();
             remove = pack.findCyclePacking();
+            level++;
         }
         return heurK;
     }
@@ -551,7 +593,9 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     }
 
     public Deque<Integer> findBestCycle() {
-        for (Integer nodeId : new HashSet<>(nodeMap.keySet())) {
+        LinkedList<Integer> shuffledList = new LinkedList<>(nodeMap.keySet());
+        Collections.shuffle(shuffledList);
+        for (Integer nodeId : shuffledList) {
             if (nodeMap.containsKey(nodeId) && !nodeMap.get(nodeId).isFixed()) {
                 int twoCycleNodeId = getNode(nodeId).isTwoCycle();
                 if (twoCycleNodeId != -1) {
