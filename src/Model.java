@@ -44,6 +44,6 @@ public class Model {
                 }
             }
         }
-        return 1 / (1 + Math.exp(-in.get(0)));
+        return utils.round(1 / (1 + Math.exp(-in.get(0))), 5);
     }
 }
