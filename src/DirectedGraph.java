@@ -12,6 +12,12 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     BiMap<String, Integer> dict = HashBiMap.create();
     int k;
     Stack<Integer> solution = new Stack<>();
+    Map<Double, Set<Integer>> invPredictions = new TreeMap<>();
+    Map<Integer, Double> predictions = new HashMap<>();
+    Map<Integer, Double> invInPositions = new HashMap<>();
+    List<Double> inPositions = new ArrayList<>();
+    Map<Integer, Double> invOutPositions = new HashMap<>();
+    List<Double> outPositions = new ArrayList<>();
 
     DirectedGraph(String fileName) {
         try {
@@ -243,6 +249,10 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return result;
     }
 
+    /**
+     * Wrapper to calculate all petal values without limit. !WARNING! can be extremely expensive.
+     * Petal-Values will be stored inside nodes
+     */
     public void calculateAllPetals() {
         for (Integer nodeId : new HashSet<>(nodeMap.keySet())) {
             calculatePetal(nodeId);
@@ -382,6 +392,9 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             nodeMap.get(postNode).removeInNode(nodeID);
         }
         nodeMap.remove(nodeID);
+        if (predictions.containsKey(nodeID)) {
+            removePrediction(nodeID);
+        }
         return true;
     }
 
@@ -911,7 +924,6 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
     public void extractNodeMetaData(BufferedWriter bw) throws IOException {
         String instance = name;
-        int n = nodeMap.size();
         int week;
         if (instance.substring(0, instance.lastIndexOf('/')).contains("3")) {
             week = 3;
@@ -921,45 +933,194 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
         for (DirectedNode node : new HashSet<>(nodeMap.values())) {
             int id = node.getNodeID();
-            double inDegree = utils.round((double) node.getInDegree() / n, 6);
-            double outDegree = utils.round((double) node.getOutDegree() / n, 6);
 
-            double maxInOut = Math.max(inDegree, outDegree);
-            double minInOut = Math.min(inDegree, outDegree);
+            List<Double> l = getNodeMetaData(id);
 
-
-            double petal3 = utils.round((double)calculatePetal(id, 3).getValue()/n, 6);
-            double petal5 = utils.round((double)calculatePetal(id, 5).getValue()/n, 6);
-
-            int inInNodes = 0;
-            for (Integer inNode : node.getInNodes()) {
-                inInNodes += nodeMap.get(inNode).getInDegree();
+            bw.write(instance + "," + week + "," + id);
+            for (double d: l) {
+                bw.write( "," + d);
             }
-            double inInDegree = utils.round((double) inInNodes / n, 6);
-
-
-            int outOutNodes = 0;
-            for (Integer outNode : node.getOutNodes()) {
-                outOutNodes += nodeMap.get(outNode).getOutDegree();
-            }
-            double outOutDegree = utils.round((double) outOutNodes / n, 6);
-
-            int biDirectionalEdges = node.biDirectionalCount();
-
-            int nonBiInNodes = node.getInDegree() - biDirectionalEdges;
-            int nonBiOutNodes = node.getInDegree() - biDirectionalEdges;
-
-            double biDirectionalDegree = utils.round((double) biDirectionalEdges / n, 6);
-            double noBiInDegree = utils.round((double) nonBiInNodes / n, 6);
-            double noBiOutDegree = utils.round((double) nonBiOutNodes / n, 6);
-
-            bw.write(instance + "," + week + "," + id + "," + inDegree + "," + outDegree + "," + maxInOut + "," +
-                    minInOut + "," + inInDegree + "," + outOutDegree + "," + biDirectionalDegree + "," +
-                    noBiInDegree + "," + noBiOutDegree + "," + petal3 + "," + petal5 + "\n");
+            bw.write("\n");
 
         }
     }
 
+    /**
+     * Calculates all metadata values for the given Node.
+     * The parameters will be normalized by the current state of the graph
+     * @param nodeId id of the node that the meta should be calculated for
+     * @return List of all parameters
+     */
+    public List<Double> getNodeMetaData(int nodeId) {
+
+        if (inPositions.isEmpty()) {
+            updatePositions();
+        }
+        else if(Math.random() > 0.8) {
+            updatePositions();
+        }
+
+        List<Double> res = new ArrayList<>();
+
+        int n = nodeMap.size();
+
+        DirectedNode node = nodeMap.get(nodeId);
+        double inDegree = utils.round((double) node.getInDegree() / n, 6);
+        double outDegree = utils.round((double) node.getOutDegree() / n, 6);
+
+        res.add(inDegree);
+        res.add(outDegree);
+
+        double maxInOut = Math.max(inDegree, outDegree);
+        double minInOut = Math.min(inDegree, outDegree);
+
+        res.add(maxInOut);
+        res.add(minInOut);
+
+        int inInNodes = 0;
+        int inOutNodes = 0;
+        for (Integer inNode : node.getInNodes()) {
+            inInNodes += nodeMap.get(inNode).getInDegree();
+            inOutNodes += nodeMap.get(inNode).getOutDegree();
+        }
+        double inInDegree = utils.round((double) inInNodes / n, 6);
+        double inOutDegree = utils.round((double) inOutNodes / n, 6);
+        res.add(inInDegree);
+        res.add(inOutDegree);
+
+        int outOutNodes = 0;
+        int outInNodes = 0;
+        for (Integer outNode : node.getOutNodes()) {
+            outOutNodes += nodeMap.get(outNode).getOutDegree();
+            outInNodes += nodeMap.get(outNode).getInDegree();
+        }
+        double outOutDegree = utils.round((double) outOutNodes / n, 6);
+        double outInDegree = utils.round((double) outInNodes / n, 6);
+        res.add(outOutDegree);
+        res.add(outInDegree);
+
+        int biDirectionalEdges = node.biDirectionalCount();
+
+        int nonBiInNodes = node.getInDegree() - biDirectionalEdges;
+        int nonBiOutNodes = node.getOutDegree() - biDirectionalEdges;
+
+        double biDirectionalDegree = utils.round((double) biDirectionalEdges / Math.min(node.getInDegree(), node.getOutDegree()), 6);
+        double noBiInDegree = utils.round((double) nonBiInNodes / Math.min(node.getInDegree(), node.getOutDegree()), 6);
+        double noBiOutDegree = utils.round((double) nonBiOutNodes / Math.min(node.getInDegree(), node.getOutDegree()), 6);
+
+        res.add(biDirectionalDegree);
+        res.add(noBiInDegree);
+        res.add(noBiOutDegree);
+
+        res.add(utils.round((double)calculatePetal(nodeId, 3).getValue()/n, 6));
+
+        res.add(getRelativeInRank(nodeId));
+        res.add(getRelativeOutRank(nodeId));
+
+        return res;
+    }
+
+    private void updatePositions() {
+        inPositions.clear();
+        outPositions.clear();
+        invInPositions.clear();
+        invOutPositions.clear();
+
+        int n = nodeMap.size();
+        for (DirectedNode node : nodeMap.values()) {
+            double inDeg = utils.round ((double)node.getInDegree()/n, 5);
+            double outDeg = utils.round ((double)node.getOutDegree()/n, 5);
+
+            inPositions.add(inDeg);
+            invInPositions.put(node.getNodeID(), inDeg);
+
+            outPositions.add(outDeg);
+            invOutPositions.put(node.getNodeID(), outDeg);
+        }
+    }
+
+    private double getRelativeInRank(int nodeId) {
+        int index = inPositions.indexOf(invInPositions.get(nodeId));
+        return utils.round((double)index/inPositions.size(), 6);
+    }
+
+    private double getRelativeOutRank(int nodeId) {
+        int index = outPositions.indexOf(invOutPositions.get(nodeId));
+        return utils.round((double)index/outPositions.size(), 6);
+    }
+
+    /**
+     * Will modify the graph's prediction map. After the prediction map is cleaned there will be batchSize - |mapSize|
+     * new Nodes added to the prediction map. Predictions are made using the given model. The methods will calculate
+     * each node's meta-data in order to make the prediction.
+     * @param batchSize Size to which the prediction map should be filled
+     * @param model Neural Network that will calculate predictions based on meta-data
+     */
+    public void createPredictionsForBatch(int batchSize, Model model) {
+        // Cleaning predictions
+        for (Integer nodePd : new HashSet<>(predictions.keySet())) {
+            if (nodeMap.containsKey(nodePd)) {
+                continue;
+            }
+            removePrediction(nodePd);
+        }
+        // End cleaning predictions
+
+        Set<Integer> idsToCalculate;
+        if (predictions.size() + batchSize >= nodeMap.size()) {
+            idsToCalculate = new HashSet<>(nodeMap.keySet());
+        } else {
+            idsToCalculate = new HashSet<>();
+            List<Integer> ids = new ArrayList<>(nodeMap.keySet());
+            Collections.shuffle(ids);
+            for (int i = 0; i < ids.size() && idsToCalculate.size() < predictions.size() + batchSize; i++) {
+                int cur = ids.get(i);
+                if (!predictions.containsKey(cur)) {
+                    idsToCalculate.add(cur);
+                }
+            }
+        }
+
+        for (Integer nodeId : new HashSet<>(idsToCalculate)) {
+            if (!predictions.containsKey(nodeId)) {
+                double predict = model.predict(getNodeMetaData(nodeId));
+                if (invPredictions.containsKey(predict)) {
+                    invPredictions.get(predict).add(nodeId);
+                } else {
+                    Set<Integer> l = new HashSet<>();
+                    l.add(nodeId);
+                    invPredictions.put(predict, l);
+                }
+                predictions.put(nodeId, predict);
+            }
+        }
+    }
+
+    /**
+     * Uses the prediction map to delete all nodes greater or equal to a given limit. After all nodes are deleted the
+     * graph will be cleaned.
+     * @param limit A Node will be deleted if its prediction is greater or equal to this value
+     * @return All nodeIds that have been deleted due to predictions as well as cleaning
+     */
+    public Set<Integer> deleteNodesByPredictions(double limit) {
+        Set<Integer> nodesToDelete = new HashSet<>();
+        for (double key : invPredictions.keySet()) {
+            if (key >= limit) {
+                nodesToDelete.addAll(invPredictions.get(key));
+            }
+        }
+        for (Integer nodeId : nodesToDelete) {
+            removeNode(nodeId);
+        }
+        nodesToDelete.addAll(rootClean());
+        return nodesToDelete;
+    }
+
+    private void removePrediction(int nodeId) {
+        double predict = predictions.get(nodeId);
+        predictions.remove(nodeId);
+        invPredictions.get(predict).remove(nodeId);
+    }
 
     @Override
     public int compareTo(DirectedGraph o) {
