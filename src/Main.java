@@ -1,9 +1,6 @@
 import gurobi.*;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
 public class Main {
@@ -21,12 +18,12 @@ public class Main {
     public static Map<String, List<Double>> timeMap;
     public static Map<String, List<Integer>> recMap;
     public static GRBEnv env;
-    private static int petalK = 4;
-    private static int petalRec = 16;
-    private static boolean petalEnabled = true;
-    private static int costK = 9;
-    private static int costRec = 49;
-    private static boolean costEnabled = true;
+    private static final int petalK = 4;
+    private static final int petalRec = 16;
+    private static final boolean petalEnabled = true;
+    private static final int costK = 9;
+    private static final int costRec = 49;
+    private static final boolean costEnabled = true;
     private static boolean interrupt;
 
     public static Set<Integer> dfvsBranch(DirectedGraph graph) {
@@ -310,7 +307,7 @@ public class Main {
 
         Packing packing = new Packing(graph);
 
-        List<Set<Integer>> digraphs =  packing.getDigraphs();
+        List<Set<Integer>> digraphs = packing.getDigraphs();
         Set<Integer> safeToDeleteDigraph = packing.getSafeToDeleteDigraphNodes();
 
         cleanedNodes.addAll(safeToDeleteDigraph);
@@ -320,17 +317,17 @@ public class Main {
 
         digraphs = graph.cleanDigraphSet(digraphs);
 
-        List<String> k = new ArrayList<>();
+        List<Integer> k = new ArrayList<>();
         if (graph.nodeMap.size() > 0) {
             String filename = "./" + args.substring(args.lastIndexOf('/') + 1) + ".lp";
             graph.createTopoLPFile(filename, digraphs);
             k = ilp(filename, Double.MAX_VALUE);
         }
         if (k != null) {
-            for (String s : k) {
-                System.out.println(s);
+            for (Integer i : k) {
+                System.out.println(i);
             }
-            for (Integer i: cleanedNodes) {
+            for (Integer i : cleanedNodes) {
                 System.out.println(i);
             }
         }
@@ -338,65 +335,138 @@ public class Main {
 
     public static void main(String[] args) throws IOException, GRBException {
 
+/*
+        // #### GUROBI ####
         System.out.print("# ");
 
         env = new GRBEnv();
         env.set(GRB.IntParam.OutputFlag, 0);
-
-
-        env.start();
-
-        productionMain(args[0]);
-
-
-        // #### DEVELOP ONLY ####
-        /*
-        solSizes = utils.loadSolSizes();
-        solSizes3 = utils.loadSolSizes3();
         double timelimit = 180.0;
         env.set(GRB.DoubleParam.TimeLimit, timelimit);
+        env.start();
 
-        // #### VALIDATE INSTANCES ####
-        String instanceFile = "instances/all_instances.txt";
-        BufferedReader br = new BufferedReader(new FileReader(instanceFile));
+        // #### GUROBI END ####
+
+ */
+        //productionMain(args[0]);
+
+        // #### DEVELOP ONLY ####
+        int iterations = 10;
+        String fileToRun = "instances/all_instances.txt";
+        String fileToSave = "./graph-metadata/synth_net_v2.csv";
+        solSizes = utils.loadSolSizes();
+        solSizes3 = utils.loadSolSizes3();
+
+        /*
+        BufferedWriter bw = new BufferedWriter(new FileWriter("./graph-metadata/vertices.csv"));
+
+        bw.write("instance,week,nodeId,inDegree,outDegree,maxInOut,minInOut," +
+                "inInDegree,inOutDegree,outOutDegree,outInDegree," +
+                "biDirDegree,noBiInDegree,noBiOutDegree,petal3,relInPos,relOutPos");
+        bw.write("\n");
+        */
+        BufferedWriter bw = new BufferedWriter(new FileWriter(fileToSave));
+
+        bw.write("instance");
+        for (int i = 0; i < iterations; i++) {
+            bw.write(",k" + i);
+        }
+        bw.write(",maxTime\n");
+
+        BufferedReader br = new BufferedReader(new FileReader(fileToRun));
+        int numberOfInstances = (int)br.lines().count();
+        int c = 0;
+        br = new BufferedReader(new FileReader(fileToRun));
         String instance = br.readLine();
+
+        Model m = utils.loadMatrix("graph-metadata/synth_mat_v2.txt");
+
         while (instance != null) {
-            File file = new File(instance);
-            if (!file.isFile()) {
-                System.out.println(instance);
-                return;
+            c++;
+
+            String name = instance.substring(instance.indexOf("instances/")+10);
+            System.out.println(c + "/" + numberOfInstances + ": " +  name);
+
+            long maxTime = 0;
+            bw.write(name);
+            System.out.print("\t\t|");
+            for (int j = 0; j < iterations; j++) {
+                System.out.print("-");
             }
+            System.out.print("|");
+            for (int i = 0; i < iterations; i++) {
+                long time = -System.nanoTime();
+
+                // Put Heuristic here
+                int k = NNHeuristic(instance, m);
+
+                time += System.nanoTime();
+                if (time > maxTime) {
+                    maxTime = time;
+                }
+                bw.write(","+ k);
+
+                // Progress Bar
+                for (int j = 0; j < iterations + 1; j++) {
+                    System.out.print("\b");
+                }
+                for (int j = 0; j <= i; j++) {
+                    System.out.print("█");
+                }
+                for (int j = i+1; j < iterations; j++) {
+                    System.out.print("-");
+                }
+                System.out.print("|");
+                //Progress Bar end
+
+            }
+            double mTime = utils.round((double)maxTime/1_000_000_000, 4);
+            bw.write("," + mTime + "\n");
+            bw.flush();
+            System.out.println("\t max time: " + mTime + "sec");
+
+
+            //createNodeData(iterations, solutions, bw, instance, name);
             instance = br.readLine();
         }
 
-        System.out.println("Validation passed");
+        bw.close();
 
-        runILP(instanceFile, timelimit);
+        //System.out.println("Validation passed");
+
+
+
+
+        //runILP(instanceFile, timelimit);
         // #### VALIDATE INSTANCES ####
 
         // #### DEVELOP ONLY ####
 
 
-         */
+    }
+
+    private static void createNodeData(int iterations, Map<String, List<Integer>> solutions, BufferedWriter bw, String instance, String name) throws IOException {
+        DirectedGraph g = new DirectedGraph(instance);
+        for (int i = 0; i < iterations; i++) {
+            List<Integer> sol = new ArrayList<>(solutions.get(name));
+            int b = new Random().nextInt(sol.size() - 1);
+            Collections.shuffle(sol);
+            for (int j = 0; j < b; j++) {
+                g.removeNode(sol.get(j));
+            }
+            g.rootClean();
+            g.extractNodeMetaData(bw);
+
+        }
     }
 
     private static void runILP(String file, double timelimit) throws IOException, GRBException {
         BufferedReader br = new BufferedReader(new FileReader(file));
         String instance = br.readLine();
 
-        System.out.println("instance,k,fileTime,cleanTime,digraphTime,totalTime");
-        boolean skip = true;
+        System.out.println("instance;k;fileTime;cleanTime;digraphTime;totalTime;solution");
         while (instance != null) {
             instance = instance.split("\t")[0];
-
-            if(instance.contains("synth-n_3500-m_1304726-k_150-p_0.2.txt")) skip = false; //checkpoint
-
-            if (skip) {
-                instance = br.readLine();
-                continue;
-            }
-
-            //instance = "./instances/synthetic/synth-n_120-m_1600-k_8-p_0.2.txt";
             long time = -System.nanoTime();
 
             String instanceName = instance.substring(instance.indexOf("instances/") + 10);
@@ -404,12 +474,13 @@ public class Main {
             int optk;
             if (name.contains("3")) {
                 optk = solSizes3.get(instance.substring(instance.lastIndexOf("/") + 1));
+                instance = br.readLine();
+                continue;
             } else {
                 optk = solSizes.get(instance.substring(instance.lastIndexOf("/") + 1));
             }
 
             DirectedGraph graph = new DirectedGraph(instance);
-            System.out.print(instance);
 
             long cleanTime = -System.nanoTime();
             Set<Integer> cleanedNodes = graph.rootClean();
@@ -418,7 +489,7 @@ public class Main {
             long digraphTime = -System.nanoTime();
             Packing packing = new Packing(graph);
 
-            List<Set<Integer>> digraphs =  packing.getDigraphs();
+            List<Set<Integer>> digraphs = packing.getDigraphs();
             Set<Integer> safeToDeleteDigraph = packing.getSafeToDeleteDigraphNodes();
 
             cleanedNodes.addAll(safeToDeleteDigraph);
@@ -428,12 +499,17 @@ public class Main {
 
             cleanedNodes.addAll(graph.rootClean());
 
+            if (graph.nodeMap.size() > 1000 || graph.nodeMap.isEmpty()) {
+                instance = br.readLine();
+                continue;
+            }
+
             double digraphSec = utils.round((digraphTime + System.nanoTime()) / 1_000_000_000.0, 4);
 
             long fileTime = -System.nanoTime();
 
             int kClean = cleanedNodes.size();
-            List<String> k = new ArrayList<>();
+            List<Integer> k = new ArrayList<>();
             double fileSec = 0.0;
             if (graph.nodeMap.size() > 0) {
                 graph.createTopoLPFile(digraphs);
@@ -441,33 +517,32 @@ public class Main {
 
                 k = ilp("ILPs/" + instanceName, Math.max(0.001, timelimit - fileSec - digraphSec));
             }
+            System.out.print(instance);
             if (k == null) {
-                if(optk == -1) {
+                if (optk == -1) {
                     // Yellow: a timeout that also has no known solution
                     System.out.print("\u001B[33m !both Timeouts! \u001B[0m");
                 }
-                System.out.println(",-1," + fileSec + "," + cleanSec + "," + digraphSec + "," + timelimit);
+                System.out.println(";-1;" + fileSec + ";" + cleanSec + ";" + digraphSec + ";" + timelimit + ";[]");
             } else {
 
-                if ( optk == -1) {
+                if (optk == -1) {
                     // Green: a Solution with no known optimal Solution.
                     System.out.print("\u001B[32m !Solution unkown! \u001B[0m");
-                }
-
-                else if (optk != k.size() + kClean) {
+                } else if (optk != k.size() + kClean) {
                     // Red: an incorrect Solution
                     System.out.print("\u001B[31m !Incorrect Solution! \u001B[0m");
                 }
 
                 double sec = utils.round((time + System.nanoTime()) / 1_000_000_000.0, 4);
-                System.out.println("," + (k.size() + kClean) + "," + fileSec + "," + cleanSec + "," + digraphSec + "," + sec);
+                System.out.println(";" + (k.size() + kClean) + ";" + fileSec + ";" + cleanSec + ";" + digraphSec + ";" + sec + ";" + k);
             }
             instance = br.readLine();
             //break;
         }
     }
 
-    private static List<String> ilp(String file, double timelimit) {
+    private static List<Integer> ilp(String file, double timelimit) {
 
         try {
             GRBModel model = new GRBModel(env, file);
@@ -484,10 +559,10 @@ public class Main {
             }
 
             if (optimstatus == GRB.Status.OPTIMAL) {
-                List<String> res = new ArrayList<>();
+                List<Integer> res = new ArrayList<>();
                 for (GRBVar var : model.getVars()) {
                     if (var.get(GRB.DoubleAttr.X) > 0.9 && var.get(GRB.StringAttr.VarName).contains("x")) {
-                        res.add(var.get(GRB.StringAttr.VarName).substring(1));
+                        res.add(Integer.valueOf(var.get(GRB.StringAttr.VarName).substring(1)));
                     }
                 }
                 return res;
@@ -499,8 +574,7 @@ public class Main {
                 System.out.println("Model is unbounded");
             } else if (optimstatus == GRB.Status.TIME_LIMIT) {
                 return null;
-            }
-            else {
+            } else {
                 System.out.println("Optimization was stopped with status = "
                         + optimstatus);
             }
@@ -513,305 +587,52 @@ public class Main {
         return null;
     }
 
-    private static void parameterOptimization() {
-        // fill Maps
-        timeMap = new TreeMap<>();
-        recMap = new HashMap<>();
-        try {
-            BufferedReader br = new BufferedReader(new FileReader("instances/run_me.txt"));
-            String line = br.readLine();
-            while (line != null) {
-                line = line.split("\t")[0];
-                timeMap.put(line.substring(line.lastIndexOf('/') + 1), new ArrayList<>());
-                recMap.put(line.substring(line.lastIndexOf('/') + 1), new ArrayList<>());
-                line = br.readLine();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        petalK = 4;
-        petalRec = 16;
-        costRec = 49;
-        costK = 9;
-        petalEnabled = true;
-        costEnabled = true;
-        for (int i : List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)) {
-            petalK = i;
-            System.out.println("petalK: " + petalK + " | petalRec: " + petalRec + " | costK: " + costK + " | costRec: " + costRec);
-            run5kRec();
-        }
-        /*
-        for (int i : List.of(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)) {
-            costK = i;
-            System.out.println("petalK: " + petalK + " | petalRec: " + petalRec + " | costK: " + costK + " | costRec: " + costRec);
-            run5kRec();
-        }
+    private static String randomHeuristic(String file) {
+        DirectedGraph g = new DirectedGraph(file);
 
-         */
-        printTimeMap(timeMap);
+        long time = -System.nanoTime();
+
+        Set<Integer> k = g.rootClean();
+
+        while (!g.nodeMap.isEmpty()) {
+            Set<Integer> set = g.nodeMap.keySet();
+            int index = new Random().nextInt(set.size());
+            Iterator<Integer> it = set.iterator();
+            for (int i = 0; i < index; i++) {
+                it.next();
+            }
+            int nodeToDelete = it.next();
+            g.removeNode(nodeToDelete);
+            k.add(nodeToDelete);
+            k.addAll(g.rootClean());
+        }
+        double sec = utils.round((double)(time+System.nanoTime())/1_000_000_000, 4);
+        return "" + k.size();
     }
 
-    private static void rootLowerbounds() {
-        File files = new File("instances/complex/");
-        for (File file : files.listFiles()) {
-            DirectedGraph graph = new DirectedGraph(file.getPath());
+    private static int NNHeuristic(String file, Model model) {
+        DirectedGraph g = new DirectedGraph(file);
 
-            String name = file.getPath().substring(18);
+        Set<Integer> k = g.rootClean();
 
-            System.out.print(name);
+        int batch = 30;
+        double limit = 0.8;
 
-            graph.k = Integer.MAX_VALUE;
-            Set<Integer> allDfvs = new HashSet<>(graph.cleanGraph());
-            graph.k = 0;
+        while (!g.nodeMap.isEmpty() && g.nodeMap.size() != g.predictions.size()) {
+            g.createPredictionsForBatch(batch, model);
 
-            Packing packing = new Packing(graph);
-            packing.getDigraphs();
-            Set<Integer> newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
-            graph.removeAllNodes(newDeletedNodes);
-            allDfvs.addAll(newDeletedNodes);
-            while (!newDeletedNodes.isEmpty()) {
-                packing = new Packing(graph);
-                packing.getDigraphs();
-                newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
-                graph.removeAllNodes(newDeletedNodes);
-                allDfvs.addAll(newDeletedNodes);
+            k.addAll(g.deleteNodesByPredictions(limit));
+
+            if (g.predictions.size() == batch) {
+                batch += 10;
+                limit -= 0.05;
             }
-
-            graph.k = Integer.MAX_VALUE;
-            allDfvs.addAll(graph.cleanGraph());
-            graph.k = 0;
-
-            graph.clearStack();
-            Set<DirectedGraph> SCCs = new Tarjan(graph).getSCCGraphs();
-            graph.clearStack();
-
-            int lowerbound = allDfvs.size();
-            int cleaning = allDfvs.size();
-            for (DirectedGraph scc : SCCs) {
-                Packing sccPacking = new Packing(scc);
-                int k = sccPacking.findCyclePacking().size();
-                lowerbound += k;
-            }
-            System.out.println(";" + solSizes.get(name) + ";" + lowerbound + ";" + cleaning + ";c");
         }
-        files = new File("instances/synthetic/");
-        for (File file : files.listFiles()) {
-            DirectedGraph graph = new DirectedGraph(file.getPath());
-
-            String name = file.getPath().substring(20);
-
-            System.out.print(name);
-
-            graph.k = Integer.MAX_VALUE;
-            Set<Integer> allDfvs = new HashSet<>(graph.cleanGraph());
-            graph.k = 0;
-
-            Packing packing = new Packing(graph);
-            packing.getDigraphs();
-            Set<Integer> newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
-            graph.removeAllNodes(newDeletedNodes);
-            allDfvs.addAll(newDeletedNodes);
-            while (!newDeletedNodes.isEmpty()) {
-                packing = new Packing(graph);
-                packing.getDigraphs();
-                newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
-                graph.removeAllNodes(newDeletedNodes);
-                allDfvs.addAll(newDeletedNodes);
-            }
-
-            graph.k = Integer.MAX_VALUE;
-            allDfvs.addAll(graph.cleanGraph());
-            graph.k = 0;
-
-            graph.clearStack();
-            Set<DirectedGraph> SCCs = new Tarjan(graph).getSCCGraphs();
-            graph.clearStack();
-
-            int lowerbound = allDfvs.size();
-            int cleaning = allDfvs.size();
-            for (DirectedGraph scc : SCCs) {
-
-                Packing sccPacking = new Packing(scc);
-                int k = sccPacking.findCyclePacking().size();
-                lowerbound += k;
-            }
-            System.out.println(";" + solSizes.get(name) + ";" + lowerbound + ";" + cleaning + ";s");
+        while (!g.nodeMap.isEmpty()) {
+            k.addAll(g.deleteNodesByPredictions(limit));
+            limit -= 0.05;
         }
-    }
 
-    private static void rootLowerboundsWeek3() {
-        File files = new File("instances/complex3/");
-        for (File file : files.listFiles()) {
-            String name = file.getPath().substring(19);
-
-
-            if (solSizes.get(name) == -1) {
-                continue;
-            }
-
-            DirectedGraph graph = new DirectedGraph(file.getPath());
-
-            System.out.print(name);
-
-            graph.k = Integer.MAX_VALUE;
-            Set<Integer> allDfvs = new HashSet<>(graph.cleanGraph());
-            graph.k = 0;
-
-            Packing packing = new Packing(graph);
-            packing.getDigraphs();
-            Set<Integer> newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
-            graph.removeAllNodes(newDeletedNodes);
-            allDfvs.addAll(newDeletedNodes);
-            while (!newDeletedNodes.isEmpty()) {
-                packing = new Packing(graph);
-                packing.getDigraphs();
-                newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
-                graph.removeAllNodes(newDeletedNodes);
-                allDfvs.addAll(newDeletedNodes);
-            }
-
-            graph.k = Integer.MAX_VALUE;
-            allDfvs.addAll(graph.cleanGraph());
-            graph.k = 0;
-
-            graph.clearStack();
-            Set<DirectedGraph> SCCs = new Tarjan(graph).getSCCGraphs();
-            graph.clearStack();
-
-            int lowerbound = allDfvs.size();
-            int cleaning = allDfvs.size();
-            for (DirectedGraph scc : SCCs) {
-                Packing sccPacking = new Packing(scc);
-                int k = sccPacking.findCyclePacking().size();
-                lowerbound += k;
-            }
-            System.out.println(";" + solSizes.get(name) + ";" + lowerbound + ";" + cleaning + ";c");
-        }
-        files = new File("instances/synthetic3/");
-        for (File file : files.listFiles()) {
-
-            String name = file.getPath().substring(21);
-
-            if (solSizes.get(name) == -1) {
-                continue;
-            }
-
-            DirectedGraph graph = new DirectedGraph(file.getPath());
-
-            System.out.print(name);
-
-            graph.k = Integer.MAX_VALUE;
-            Set<Integer> allDfvs = new HashSet<>(graph.cleanGraph());
-            graph.k = 0;
-
-            Packing packing = new Packing(graph);
-            packing.getDigraphs();
-            Set<Integer> newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
-            graph.removeAllNodes(newDeletedNodes);
-            allDfvs.addAll(newDeletedNodes);
-            while (!newDeletedNodes.isEmpty()) {
-                packing = new Packing(graph);
-                packing.getDigraphs();
-                newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
-                graph.removeAllNodes(newDeletedNodes);
-                allDfvs.addAll(newDeletedNodes);
-            }
-
-            graph.k = Integer.MAX_VALUE;
-            allDfvs.addAll(graph.cleanGraph());
-            graph.k = 0;
-
-            graph.clearStack();
-            Set<DirectedGraph> SCCs = new Tarjan(graph).getSCCGraphs();
-            graph.clearStack();
-
-            int lowerbound = allDfvs.size();
-            int cleaning = allDfvs.size();
-            for (DirectedGraph scc : SCCs) {
-
-                Packing sccPacking = new Packing(scc);
-                int k = sccPacking.findCyclePacking().size();
-                lowerbound += k;
-            }
-            System.out.println(";" + solSizes.get(name) + ";" + lowerbound + ";" + cleaning + ";s");
-        }
-    }
-
-    private static void printTimeMap(Map<String, List<Double>> map) {
-        for (String key : map.keySet()) {
-            List<Double> times = map.get(key);
-            System.out.print(key);
-            for (Double time : times) {
-                System.out.print("\t" + time);
-            }
-            System.out.println();
-        }
-    }
-
-    private static void run5kRec() {
-        Stack<String> files = new Stack<>();
-        try {
-            BufferedReader br = new BufferedReader(new FileReader("instances/run_me.txt"));
-            String line = br.readLine();
-            while (line != null) {
-                line = line.split("\t")[0];
-                files.add(line);
-                line = br.readLine();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        Thread t1 = new Thread(() -> {
-            while (!files.isEmpty()) {
-                String finalLine = files.pop();
-                Thread t = new Thread(() -> {
-                    developMain(finalLine);
-                });
-                t.start();
-                try {
-                    t.join(20_000); //Time-Limit
-                    if (t.isAlive()) {
-
-                        interrupt = true;
-                        t.join();
-                        interrupt = false;
-                    }
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-        Thread t2 = new Thread(() -> {
-            while (!files.isEmpty()) {
-                String finalLine = files.pop();
-                Thread t = new Thread(() -> {
-                    developMain(finalLine);
-                });
-                t.start();
-                try {
-                    t.join(20_000); //Time-Limit
-                    if (t.isAlive()) {
-
-                        interrupt = true;
-                        t.join();
-                        interrupt = false;
-                    }
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-        t1.start();
-        t2.start();
-        try {
-            t1.join();
-            t2.join();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+        return k.size();
     }
 }
-/*
-Correct in:
-Total time: 32.5907sec
- */
