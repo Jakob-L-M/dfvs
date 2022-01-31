@@ -116,4 +116,31 @@ public class utils {
         return null;
     }
 
+    public static Map<String, List<Integer>> loadSolutions() {
+        Map<String, List<Integer>> res = new HashMap<>();
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("graph-metadata/solutions_week2.csv"));
+            br.readLine(); // skip column name line
+
+            String line = br.readLine();
+
+            while (line != null) {
+                String s = line.substring(line.lastIndexOf(';') + 1);
+                String name = line.substring(0, line.indexOf(';'));
+                s = s.replace("[", "").replace("]", "");
+                String[] splits = s.split(", ");
+                List<Integer> sol = new ArrayList<>();
+                for (String split : splits) {
+                    sol.add(Integer.valueOf(split));
+                }
+                res.put(name, sol);
+                line = br.readLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return res;
+    }
+
 }
