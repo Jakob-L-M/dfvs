@@ -72,7 +72,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return cleanGraph(true);
     }
 
-    public int deathByPacking() {
+    public int deathByPacking(int levNum, int sccNum) {
         int heurK = cleanSelfCyclesInit().size();
         //Set<Integer> delete = cleanGraph();
         //if (delete != null) heurK += delete.size();
@@ -81,10 +81,10 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         List<Deque<Integer>> remove = pack.findCyclePacking();
         int level = 0;
         while(!remove.isEmpty()) {
-            if (level > 2) {
+            if (level < levNum) {
                 Tarjan tarjan = new Tarjan(this);
                 Set<DirectedGraph> sccs = tarjan.getSCCGraphs();
-                if (sccs.size() > 10) {
+                if (sccs.size() > sccNum) {
                     for (DirectedGraph scc : sccs) {
                         heurK += Main.dfvsSolve(scc).size();
                     }

@@ -25,34 +25,43 @@ public class Packing {
         //DirectedGraph g = new DirectedGraph("instances/h_001", true);
         //System.out.println(g.size());
         //System.out.println(Main.dfvsSolve(g));
+
+        for (int runs =  0; runs < 10; runs++) {
+            for (int level = 0; level < 5; level++) {
+                for (int sccs = 1; sccs < 13; sccs+=2) {
+                    runParam(args[0], runs, level, sccs);
+                }
+            }
+        }
+
+        /*
         if (true) {
             try {
-                BufferedWriter writer = new BufferedWriter(new FileWriter("packingTimesTwoPackings.txt", true));
-                writer.write("name heurK\n");
-                File instances = new File("instances");
-                for (File subInst : instances.listFiles()) {
-                    if (subInst.getName().contains("sheet5") || !subInst.isDirectory()) continue;
-                    int count = 0;
-                    for (File instance : subInst.listFiles()) {
-                        int runs = 1;
-                        int best_heur = Integer.MAX_VALUE;
-                        int[] all_heurs = new int[runs];
-                        for (int i = 0; i < runs; i++) {
-                            DirectedGraph graph = new DirectedGraph(instance.getPath());
-                            int sol = graph.deathByPacking();
-                            all_heurs[i] = sol;
-                            if (sol < best_heur) best_heur = sol;
-                        }
-                        writer.write(instance.getName() + " " + best_heur + "\n");// + " out of " + Arrays.toString(all_heurs) + "\n");
-                        System.out.println("done");
-                        //if (count > 100) break;
-                        System.out.println("count: " + count++);
+            BufferedWriter writer = new BufferedWriter(new FileWriter("packingTimes"+"runs"+runs+"level"+level+"sccs"+sccs +".txt", true));
+            writer.write("name heurK\n");
+            File instances = new File("instances");
+            for (File subInst : instances.listFiles()) {
+                if (subInst.getName().contains("sheet5") || !subInst.isDirectory()) continue;
+                int count = 0;
+                for (File instance : subInst.listFiles()) {
+                    int best_heur = Integer.MAX_VALUE;
+                    int[] all_heurs = new int[runs];
+                    for (int i = 0; i < runs; i++) {
+                        DirectedGraph graph = new DirectedGraph(instance.getPath());
+                        int sol = graph.deathByPacking(level, sccs);
+                        all_heurs[i] = sol;
+                        if (sol < best_heur) best_heur = sol;
                     }
+                    writer.write(instance.getName() + " " + best_heur + "\n");// + " out of " + Arrays.toString(all_heurs) + "\n");
+                    System.out.println("done");
+                    //if (count > 100) break;
+                    System.out.println("count: " + count++);
                 }
-                writer.close();
-            } catch (IOException e) {
-                e.printStackTrace();
             }
+            writer.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         }
         else {
             try {
@@ -74,7 +83,29 @@ public class Packing {
                 e.printStackTrace();
             }
         }
+        */
     }
+
+    public static void runParam(String filename, int runs, int level, int sccs) {
+        try {
+            long time = - System.nanoTime();
+            BufferedWriter writer = new BufferedWriter(new FileWriter("packingTimes"+"runs"+runs+"level"+level+"sccs"+sccs +".txt", true));
+            int best_heur = Integer.MAX_VALUE;
+            int[] all_heurs = new int[runs];
+            for (int i = 0; i < runs; i++) {
+                DirectedGraph graph = new DirectedGraph(filename);
+                int sol = graph.deathByPacking(level, sccs);
+                all_heurs[i] = sol;
+                if (sol < best_heur) best_heur = sol;
+            }
+            time += System.nanoTime();
+            writer.write(filename + " " + best_heur + " out of " + Arrays.toString(all_heurs) + "\n");
+            writer.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
 
     public void safeDeletionDigraph() {
         Set<Integer> safeToDelete = new HashSet<>();
