@@ -682,8 +682,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         int c = 1;
         int cur = parent.get(nodeId);
         while (cur != start) {
-            if (c >= limit) return false;
-            c++;
+            if (c++ >= limit) return false;
             cur = parent.get(cur);
         }
         return true;
