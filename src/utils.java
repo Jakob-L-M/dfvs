@@ -48,28 +48,32 @@ public class utils {
             BufferedReader br = new BufferedReader(new FileReader("instances/optimal_solution_sizes.txt"));
             String line = br.readLine();
             while (line != null) {
+                String pref;
+                if (line.contains("synth")) {
+                    pref = "synthetic/";
+                } else {
+                    pref = "complex/";
+                }
                 String[] temp = line.split("\\s+");
-                res.put(temp[0], Integer.valueOf(temp[1]));
+                res.put(pref + temp[0], Integer.valueOf(temp[1]));
                 line = br.readLine();
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return res;
-    }
 
-    public static Map<String, Integer> loadSolSizes3() {
-        Map<String, Integer> res = new HashMap<>();
-        try {
-            BufferedReader br = new BufferedReader(new FileReader("instances/opt-sol3.txt"));
-            String line = br.readLine();
+            br = new BufferedReader(new FileReader("instances/opt-sol3.txt"));
+            line = br.readLine();
             while (line != null) {
                 String[] temp = line.split("\\s+");
+                String pref;
+                if (line.contains("synth")) {
+                    pref = "synthetic3/";
+                } else {
+                    pref = "complex3/";
+                }
                 try {
-                    res.put(temp[0], Integer.valueOf(temp[1]));
+                    res.put(pref + temp[0], Integer.valueOf(temp[1]));
                 } catch (NumberFormatException e) {
                     // catching timeout instances
-                    res.put(temp[0], -1);
+                    res.put(pref + temp[0], -1);
                 }
                 line = br.readLine();
             }
