@@ -47,6 +47,35 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         name = fileName.substring(fileName.indexOf("instances/") + 10);
     }
 
+    /**
+     * PACE Constructor
+     *
+     * @param fileName Path to file
+     * @param paceInst ture -> PACE Instance
+     */
+    DirectedGraph(String fileName, boolean paceInst) {
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader(fileName));
+            String currentLine = reader.readLine();
+            for (int i = 1; i <= Integer.parseInt(currentLine.split(" ")[0]); i++) {
+                dict.put(Integer.toString(i), i);
+                addNode(i);
+            }
+            int count = 1;
+            while ((currentLine = reader.readLine()) != null) {
+                if (currentLine.contains("#") || currentLine.contains("%") || currentLine.isEmpty()) continue;
+                String[] nodes = currentLine.split(" ");
+                for (String v : nodes) {
+                    addEdge(count, Integer.parseInt(v));
+                }
+                count++;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        name = fileName.substring(fileName.indexOf("instances/") + 10);
+    }
+
     public DirectedGraph() {
         name = "temp";
     }
@@ -98,47 +127,60 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 continue;
             }
 
-            // clean semi pendant triangle
-            if (costlyDeletions) {
-                Set<Integer> triangle = cleanSemiPendantTriangle(nodeId);
-                if (triangle != null) {
-                    k = k - 2;
-                    deletedNodes.addAll(triangle);
-                    change = true;
-                    continue;
+            // Only Bi-Directional Edges and either In- or Out Edge
+            // Remove all non Bi-Directional Edges
+            if (node.getInDegree() != node.getOutDegree() && Math.min(node.getInDegree(), node.getOutDegree()) == node.biDirectionalCount()) {
+                Set<Integer> inNodes = new HashSet<>(node.getInNodes());
+                Set<Integer> outNodes = new HashSet<>(node.getOutNodes());
+                if (outNodes.size() > inNodes.size()) {
+                    for (Integer outNode : outNodes) {
+                        if (!inNodes.contains(outNode)) {
+                            removeEdge(nodeId, outNode);
+                        }
+
+                        // Might be null if other neighbours where removed in the same step
+                        if (nodeMap.get(outNode) != null && nodeMap.get(outNode).isSinkSource()) {
+                            removeSinkSource(outNode);
+                        }
+                    }
+                } else {
+                    for (Integer inNode : inNodes) {
+                        if (!outNodes.contains(inNode)) {
+                            removeEdge(inNode, nodeId);
+                        }
+
+                        // Might be null if other neighbours where removed in the same step
+                        if (nodeMap.get(inNode) != null && nodeMap.get(inNode).isSinkSource()) {
+                            removeSinkSource(inNode);
+                        }
+                    }
                 }
             }
-
-            // clean a flower if the leftover budget is greater than 2
-            if (costlyDeletions && k > 2) {
-                int temp = cleanPetal(nodeId);
-                if (temp != -1) {
-                    k--;
-                    deletedNodes.add(temp);
-                    change = true;
-                }
-            }
-
         }
 
         // repeat until nothing is left to be cleaned
         if (change) {
             Set<Integer> newNodes = cleanGraph(costlyDeletions);
-            if (newNodes != null) {
-                deletedNodes.addAll(newNodes);
-            } else {
+            if (newNodes == null) {
                 return null;
             }
+            deletedNodes.addAll(newNodes);
         }
 
         return deletedNodes;
     }
 
     public Set<Integer> rootClean() {
+        return rootClean(null, false);
+    }
 
-        Set<Integer> nodes = new HashSet<>(nodeMap.keySet());
+    public Set<Integer> rootClean(Set<Integer> nodes, boolean quick) {
+
+        if (nodes == null) {
+            nodes = new HashSet<>(nodeMap.keySet());
+        }
         Set<Integer> deletedNodes = new HashSet<>();
-        boolean change = false;
+        boolean changed = false;
 
         for (Integer nodeId : nodes) {
 
@@ -150,6 +192,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             if (node.isSelfCycle()) {
                 removeNode(nodeId);
                 deletedNodes.add(nodeId);
+                changed = true;
                 continue;
             }
 
@@ -157,7 +200,6 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             // created sinks and sources
             if (node.isSinkSource()) {
                 removeSinkSource(nodeId);
-                change = true;
                 continue;
             }
 
@@ -167,45 +209,66 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 if (temp != -1) {
                     deletedNodes.add(temp);
                 }
-                change = true;
+                changed = true;
                 continue;
             }
 
-            if (node.getInDegree() != node.getOutDegree() && Math.min(node.getInDegree(), node.getOutDegree()) == node.biDirectionalCount()) {
+
+            // Only Bi-Directional Edges and either In- or Out Edge
+            // Remove all non Bi-Directional Edges
+            if (!quick && node.getInDegree() != node.getOutDegree() && Math.min(node.getInDegree(), node.getOutDegree()) == node.biDirectionalCount()) {
                 Set<Integer> inNodes = new HashSet<>(node.getInNodes());
                 Set<Integer> outNodes = new HashSet<>(node.getOutNodes());
                 if (outNodes.size() > inNodes.size()) {
                     for (Integer outNode : outNodes) {
                         if (!inNodes.contains(outNode)) {
-                            removeEdge(nodeId, outNode, false);
+                            removeEdge(nodeId, outNode);
+                        }
+
+                        // Might be null if other neighbours where removed in the same step
+                        if (nodeMap.get(outNode) != null && nodeMap.get(outNode).isSinkSource()) {
+                            removeSinkSource(outNode);
                         }
                     }
                 } else {
                     for (Integer inNode : inNodes) {
                         if (!outNodes.contains(inNode)) {
-                            removeEdge(inNode, nodeId, false);
+                            removeEdge(inNode, nodeId);
+                        }
+
+                        // Might be null if other neighbours where removed in the same step
+                        if (nodeMap.get(inNode) != null && nodeMap.get(inNode).isSinkSource()) {
+                            removeSinkSource(inNode);
                         }
                     }
                 }
-                change = true;
-            }
-
-            // clean semi pendant triangle
-            Set<Integer> triangle = cleanSemiPendantTriangle(nodeId);
-            if (triangle != null) {
-                deletedNodes.addAll(triangle);
-                change = true;
             }
 
         }
-
-        // repeat until nothing is left to be cleaned
-        if (change) {
-            Set<Integer> newNodes = rootClean();
-            deletedNodes.addAll(newNodes);
+        if (quick && changed) {
+            deletedNodes.addAll(rootClean(null, true));
         }
 
         return deletedNodes;
+    }
+
+    /**
+     * Cleans all Sink/Source nodes of a given Set. Will make sure, that the nodeMap is empty if there is no cycle left.
+     *
+     * @param nodes Set of nodes to be checked for cleaning
+     */
+    public void quickClean(Set<Integer> nodes) {
+        for (Integer nodeId : nodes) {
+
+            // first we check if the node is still present
+            DirectedNode node = nodeMap.get(nodeId);
+            if (node == null) continue;
+
+            // if the node is a selfCycle we will remove it and reduce k
+            if (node.isSinkSource()) {
+                removeSinkSource(nodeId);
+            }
+        }
     }
 
     /**
@@ -267,11 +330,15 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
      * present in any flower leave or the flower center itself.
      */
     public Tuple calculatePetal(int nodeId, int limit) {
-        return Petal.getPetalSet(this, nodeId, limit);
+        return Petal.getPetalSet(this, nodeId, limit, false);
+    }
+
+    public Tuple calculatePetal(int nodeId, int limit, boolean quick) {
+        return Petal.getPetalSet(this, nodeId, limit, quick);
     }
 
     public Tuple calculatePetal(int nodeId) {
-        return Petal.getPetalSet(this, nodeId, Integer.MAX_VALUE);
+        return Petal.getPetalSet(this, nodeId, Integer.MAX_VALUE, false);
     }
 
     /**
@@ -350,7 +417,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     public boolean addEdge(Integer preID, Integer postID, boolean stack) {
         DirectedNode preNode = nodeMap.get(preID);
         DirectedNode postNode = nodeMap.get(postID);
-        boolean added = preNode.addOutNode(postID) &&
+        boolean added = preNode.addOutNode(postID) &
                 postNode.addInNode(preID);
         if (stack && added) {
             this.stack.push(new StackTuple(true, preID, postID));
@@ -377,7 +444,9 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     }
 
     public boolean removeNode(Integer nodeID, boolean stack) {
-        if (!nodeMap.containsKey(nodeID)) return false;
+        if (!nodeMap.containsKey(nodeID)) {
+            return false;
+        }
         DirectedNode node = nodeMap.get(nodeID);
 
         if (stack) {
@@ -392,6 +461,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             nodeMap.get(postNode).removeInNode(nodeID);
         }
         nodeMap.remove(nodeID);
+
         if (predictions.containsKey(nodeID)) {
             removePrediction(nodeID);
         }
@@ -401,7 +471,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     public boolean removeAllNodes(Set<Integer> nodesToRemove) {
         boolean success = true;
         for (Integer u : nodesToRemove) {
-            success = success && removeNode(u);
+            success = removeNode(u) && success;
         }
         return success;
     }
@@ -469,7 +539,11 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
             } else if (stackTuple.type == StackTuple.GraphType.EDGE) {
                 // edges are always added (chain cleaning)
-                removeEdge(stackTuple.from, stackTuple.to, false);
+                if (stackTuple.added) {
+                    removeEdge(stackTuple.from, stackTuple.to, false);
+                } else {
+                    addEdge(stackTuple.from, stackTuple.to, false);
+                }
             }
         }
         //should never reach here
@@ -485,9 +559,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             removeNode(nodeID);
             for (Integer inNodeId : inNodes) {
                 DirectedNode inNode = nodeMap.get(inNodeId);
-                if (inNode == null) continue;
-                inNode.removeOutNode(nodeID);
-                if (inNode.isSinkSource()) {
+                if (inNode != null && inNode.isSinkSource()) {
                     removeSinkSource(inNodeId);
                 }
             }
@@ -496,9 +568,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             removeNode(nodeID);
             for (Integer outNodeId : outNodes) {
                 DirectedNode outNode = nodeMap.get(outNodeId);
-                if (outNode == null) continue;
-                outNode.removeInNode(nodeID);
-                if (outNode.isSinkSource()) {
+                if (outNode != null && outNode.isSinkSource()) {
                     removeSinkSource(outNodeId);
                 }
             }
@@ -521,41 +591,29 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     }
 
     public Deque<Integer> findBestCycle() {
-        for (Integer nodeId : new HashSet<>(nodeMap.keySet())) {
-            if (nodeMap.containsKey(nodeId) && !nodeMap.get(nodeId).isFixed()) {
-                int twoCycleNodeId = getNode(nodeId).isTwoCycle();
-                if (twoCycleNodeId != -1) {
-                    /* ＞︿＜
-                    if (nodeMap.get(twoCycleNodeId).isFixed()) {
+        return findBestCycle(Integer.MAX_VALUE, Integer.MAX_VALUE);
+    }
 
-                        solution.push(nodeId);
-                        removeNode(nodeId);
-                        this.k--;
-
-                        Set<Integer> cleanedNodes = cleanGraph();
-                        if(cleanedNodes != null && k >= 0) {
-                            solution.addAll(cleanedNodes);
-                        } else {
-                            return null;
-                        }
-                        continue;
-                    }
-
-                     */
-                    Deque<Integer> twoCycle = new ArrayDeque<>();
-                    twoCycle.add(twoCycleNodeId);
-                    twoCycle.add(nodeId);
-
-                    return twoCycle;
-                }
+    public Deque<Integer> findBestCycle(int sameCycleCount, int limit) {
+        for (Integer nodeId : nodeMap.keySet()) {
+            int twoCycleNodeId = getNode(nodeId).isTwoCycle();
+            if (twoCycleNodeId != -1) {
+                Deque<Integer> twoCycle = new ArrayDeque<>();
+                twoCycle.add(twoCycleNodeId);
+                twoCycle.add(nodeId);
+                return twoCycle;
             }
         }
+
+        int foundCycles = 0;
+
+        Map<Integer, Integer> cycleSizes = new HashMap<>();
+
         Set<Integer> visited = new HashSet<>();
         Map<Integer, Integer> parent = new HashMap<>();
         Deque<Integer> cycle = new ArrayDeque<>();
-        for (Integer i : nodeMap.keySet()) {
-            parent.put(i, -1);
-        }
+        int cycleLength = Integer.MAX_VALUE;
+
         for (Integer start : nodeMap.keySet()) {
             if (visited.contains(start)) continue;
             Deque<Integer> queue = new ArrayDeque<>();
@@ -563,44 +621,73 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             queue.add(start);
             visited.add(start);
             while (!queue.isEmpty()) {
-                Integer u = queue.pop();
-                for (Integer v : nodeMap.get(u).getOutNodes()) {
-                    if (!visited.contains(v)) {
-                        parent.put(v, u);
-                        visited.add(v);
-                        queue.add(v);
-                    }
-                    if (v.equals(start)) {
+                Integer currentNodeId = queue.pop();
+                for (Integer outNodeId : nodeMap.get(currentNodeId).getOutNodes()) {
+                    if (!visited.contains(outNodeId)) {
+                        parent.put(outNodeId, currentNodeId);
+                        visited.add(outNodeId);
 
-                        int w = u;
-                        while (w != -1) {
+                        // Stop searching if we surpassed the best known cycle
+                        if (cycleLength < 1000 && limitParentDepth(outNodeId, start, parent, cycleLength)) {
+                            queue.add(outNodeId);
+                        }
+                    }
+                    if (outNodeId.equals(start)) {
+                        int w = currentNodeId;
+                        while (w != start) {
                             tempCycle.add(w);
                             w = parent.get(w);
                         }
+                        tempCycle.add(start);
                     }
                     if (!tempCycle.isEmpty()) break;
                 }
                 if (!tempCycle.isEmpty()) break;
             }
-            Deque<Integer> nodesLeft = new ArrayDeque<>();
-            if (!cycle.isEmpty()) {
-                for (Integer u : tempCycle) {
-                    if (!nodeMap.get(u).isFixed()) nodesLeft.add(u);
-                }
-            } else {
-                nodesLeft = tempCycle;
-            }
-            if (tempCycle.size() <= 3 && !tempCycle.isEmpty()) {
+            foundCycles++;
+
+            int tempSize = tempCycle.size();
+            // If a 3-Cycle is found we return it directly
+            if (!tempCycle.isEmpty() && tempSize <= 3) {
                 return tempCycle;
             }
-            if (cycle.isEmpty() || (cycle.size() > nodesLeft.size() && nodesLeft.size() > 1)) {
-                cycle = nodesLeft;
+
+            // Update best cycle
+            if (!tempCycle.isEmpty() && (cycle.size() > tempSize || cycle.isEmpty())) {
+                cycle = tempCycle;
+                cycleLength = tempSize;
             }
+
+            // limit the amount of cycles
+            if (!cycleSizes.containsKey(tempSize)) {
+                cycleSizes.put(tempSize, 1);
+            } else {
+                cycleSizes.put(tempSize, cycleSizes.get(tempSize) + 1);
+            }
+            // if we found the same smallest cycle size X-Times we will return the best cycle.
+            if (cycleSizes.get(cycle.size()) >= sameCycleCount) {
+                return cycle;
+            }
+
+            if (!cycle.isEmpty() && foundCycles >= limit) {
+                return cycle;
+            }
+
         }
         if (cycle.isEmpty()) return null;
         return cycle;
     }
 
+    private boolean limitParentDepth(int nodeId, int start, Map<Integer, Integer> parent, int limit) {
+        int c = 1;
+        int cur = parent.get(nodeId);
+        while (cur != start) {
+            if (c >= limit) return false;
+            c++;
+            cur = parent.get(cur);
+        }
+        return true;
+    }
 
     public Deque<Integer> findC4s() {
         Set<Integer> visited = new HashSet<>();
@@ -855,71 +942,81 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return createTopoLPFile("ILPs/" + name + ".lp", digraphs);
     }
 
-    public String extractGraphMetaData() {
+    public List<Double> extractGraphMetaData() {
+
+        List<Double> result = new ArrayList<>();
+
         int n = nodeMap.size();
         int m = 0;
-        int maxIn = 0;
-        int maxOut = 0;
-        int minIn = Integer.MAX_VALUE;
-        int minOut = Integer.MAX_VALUE;
-        int minPetal = Integer.MAX_VALUE;
-        int maxPetal = 0;
-        List<Integer> petals = new ArrayList<>();
         List<Integer> inDegrees = new ArrayList<>();
         List<Integer> outDegrees = new ArrayList<>();
-        for (DirectedNode node : new HashSet<>(nodeMap.values())) {
+        List<Integer> inInDegrees = new ArrayList<>();
+        List<Integer> inOutDegrees = new ArrayList<>();
+        List<Integer> outInDegrees = new ArrayList<>();
+        List<Integer> outOutDegrees = new ArrayList<>();
+        for (Integer nodeId : new HashSet<>(nodeMap.keySet())) {
+
+            if (nodeId % n / 45 != 0) {
+                continue;
+            }
+
+            DirectedNode node = nodeMap.get(nodeId);
             m += node.getOutDegree();
 
             inDegrees.add(node.getInDegree());
-            if (node.getInDegree() > maxIn) {
-                maxIn = node.getInDegree();
-            }
-            if (node.getInDegree() < minIn) {
-                minIn = node.getInDegree();
-            }
-
             outDegrees.add(node.getOutDegree());
-            if (node.getOutDegree() > maxOut) {
-                maxOut = node.getOutDegree();
-            }
-            if (node.getOutDegree() < minOut) {
-                minOut = node.getOutDegree();
-            }
+            int inInNodes = 0;
+            int inOutNodes = 0;
+            int outOutNodes = 0;
+            int outInNodes = 0;
 
-            if (n <= 100 || node.getNodeID() % (n / 50) == 0) {
-                int petal = calculatePetal(node.getNodeID(), 3).getValue();
-
-                if (petal > maxPetal) {
-                    maxPetal = petal;
+            try {
+                for (Integer inNode : node.getInNodes()) {
+                    inInNodes += nodeMap.get(inNode).getInDegree();
+                    inOutNodes += nodeMap.get(inNode).getOutDegree();
                 }
-                if (petal < minPetal) {
-                    minPetal = petal;
+                for (Integer outNode : node.getOutNodes()) {
+                    outInNodes += nodeMap.get(outNode).getInDegree();
+                    outOutNodes += nodeMap.get(outNode).getOutDegree();
                 }
-                petals.add(petal);
+            } catch (NullPointerException e) {
+                e.printStackTrace();
+                System.out.println(node);
+                throw new IndexOutOfBoundsException();
             }
 
+            inInDegrees.add(inInNodes);
+            inOutDegrees.add(inOutNodes);
+            outInDegrees.add(outInNodes);
+            outOutDegrees.add(outOutNodes);
         }
+
         Collections.sort(inDegrees);
         Collections.sort(outDegrees);
-        Collections.sort(petals);
+        Collections.sort(inInDegrees);
+        Collections.sort(inOutDegrees);
+        Collections.sort(outInDegrees);
+        Collections.sort(outOutDegrees);
 
-        int inLowerQ = inDegrees.get(n / 4);
-        int inMed = inDegrees.get(n / 2);
-        int inUpperQ = inDegrees.get(3 * n / 4);
+        result.add((double) m / n);
 
-        int outLowerQ = outDegrees.get(n / 4);
-        int outMed = outDegrees.get(n / 2);
-        int outUpperQ = outDegrees.get(3 * n / 4);
+        int nth = inDegrees.size() / 10;
+        for (int i = 0; i <= 9; i++) {
+            result.add((double) inDegrees.get(i * nth) / n);
+            result.add((double) outDegrees.get(i * nth) / n);
+            result.add((double) inInDegrees.get(i * nth) / n);
+            result.add((double) inOutDegrees.get(i * nth) / n);
+            result.add((double) outInDegrees.get(i * nth) / n);
+            result.add((double) outOutDegrees.get(i * nth) / n);
+        }
+        result.add((double) inDegrees.get(inDegrees.size() - 1) / n);
+        result.add((double) outDegrees.get(inDegrees.size() - 1) / n);
+        result.add((double) inInDegrees.get(inDegrees.size() - 1) / n);
+        result.add((double) inOutDegrees.get(inDegrees.size() - 1) / n);
+        result.add((double) outInDegrees.get(inDegrees.size() - 1) / n);
+        result.add((double) outOutDegrees.get(inDegrees.size() - 1) / n);
 
-        int pLowerQ = petals.get(petals.size() / 4);
-        int pMed = petals.get(petals.size() / 2);
-        int pUpperQ = petals.get(3 * petals.size() / 4);
-
-        return "" + n + "," + m + "," + maxIn + "," + maxOut + ","
-                + minIn + "," + minOut + "," + inLowerQ + "," + inMed + "," + inUpperQ
-                + "," + outLowerQ + "," + outMed + "," + outUpperQ
-                + "," + maxPetal + "," + minPetal + "," + pLowerQ
-                + "," + pMed + "," + pUpperQ;
+        return result;
     }
 
     public void extractNodeMetaData(BufferedWriter bw) throws IOException {
@@ -937,8 +1034,8 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             List<Double> l = getNodeMetaData(id);
 
             bw.write(instance + "," + week + "," + id);
-            for (double d: l) {
-                bw.write( "," + d);
+            for (double d : l) {
+                bw.write("," + d);
             }
             bw.write("\n");
 
@@ -948,6 +1045,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     /**
      * Calculates all metadata values for the given Node.
      * The parameters will be normalized by the current state of the graph
+     *
      * @param nodeId id of the node that the meta should be calculated for
      * @return List of all parameters
      */
@@ -955,8 +1053,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
         if (inPositions.isEmpty()) {
             updatePositions();
-        }
-        else if(Math.random() > 0.8) {
+        } else if (Math.random() > 0.8) {
             updatePositions();
         }
 
@@ -1012,7 +1109,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         res.add(noBiInDegree);
         res.add(noBiOutDegree);
 
-        res.add(utils.round((double)calculatePetal(nodeId, 3).getValue()/n, 6));
+        res.add(utils.round((double) calculatePetal(nodeId, 3).getValue() / n, 6));
 
         res.add(getRelativeInRank(nodeId));
         res.add(getRelativeOutRank(nodeId));
@@ -1028,8 +1125,8 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
         int n = nodeMap.size();
         for (DirectedNode node : nodeMap.values()) {
-            double inDeg = utils.round ((double)node.getInDegree()/n, 5);
-            double outDeg = utils.round ((double)node.getOutDegree()/n, 5);
+            double inDeg = utils.round((double) node.getInDegree() / n, 5);
+            double outDeg = utils.round((double) node.getOutDegree() / n, 5);
 
             inPositions.add(inDeg);
             invInPositions.put(node.getNodeID(), inDeg);
@@ -1041,20 +1138,21 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
     private double getRelativeInRank(int nodeId) {
         int index = inPositions.indexOf(invInPositions.get(nodeId));
-        return utils.round((double)index/inPositions.size(), 6);
+        return utils.round((double) index / inPositions.size(), 6);
     }
 
     private double getRelativeOutRank(int nodeId) {
         int index = outPositions.indexOf(invOutPositions.get(nodeId));
-        return utils.round((double)index/outPositions.size(), 6);
+        return utils.round((double) index / outPositions.size(), 6);
     }
 
     /**
      * Will modify the graph's prediction map. After the prediction map is cleaned there will be batchSize - |mapSize|
      * new Nodes added to the prediction map. Predictions are made using the given model. The methods will calculate
      * each node's meta-data in order to make the prediction.
+     *
      * @param batchSize Size to which the prediction map should be filled
-     * @param model Neural Network that will calculate predictions based on meta-data
+     * @param model     Neural Network that will calculate predictions based on meta-data
      */
     public void createPredictionsForBatch(int batchSize, Model model) {
         // Cleaning predictions
@@ -1099,6 +1197,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     /**
      * Uses the prediction map to delete all nodes greater or equal to a given limit. After all nodes are deleted the
      * graph will be cleaned.
+     *
      * @param limit A Node will be deleted if its prediction is greater or equal to this value
      * @return All nodeIds that have been deleted due to predictions as well as cleaning
      */
