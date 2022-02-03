@@ -78,13 +78,17 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         //if (delete != null) heurK += delete.size();
         heurK += rootClean().size();
         Packing pack = new Packing(this);
-        List<Deque<Integer>> remove = pack.findCyclePacking();
+        List<Deque<Integer>> remove = pack.newFindCyclePacking(6,3);
         int level = 0;
         while(!remove.isEmpty()) {
-            if (level < levNum) {
+            if (level > levNum) {
                 Tarjan tarjan = new Tarjan(this);
                 Set<DirectedGraph> sccs = tarjan.getSCCGraphs();
-                if (sccs.size() > sccNum) {
+                int graphMax = 0;
+                for (DirectedGraph scc : sccs) {
+                    graphMax = Math.max(graphMax, scc.size());
+                }
+                if (sccs.size() > sccNum && graphMax < 3_000) {
                     for (DirectedGraph scc : sccs) {
                         heurK += Main.dfvsSolve(scc).size();
                     }
@@ -92,6 +96,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 }
             }
             int count = 0;
+            Set<Integer> changedNodes = new HashSet<>();
             for (Deque<Integer> circle : remove) {
                 int nodeToDelete = circle.pop();
                 for (Integer v : circle) {
@@ -101,12 +106,13 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                     }
                 }
                 removeNode(nodeToDelete);
+                changedNodes.add(nodeToDelete);
                 count++;
             }
             heurK += count;
             System.out.println("added " + count);
             heurK += rootClean().size();
-            remove = pack.findCyclePacking();
+            remove = pack.newFindCyclePacking(6, 3);
             level++;
         }
         return heurK;
@@ -212,6 +218,71 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             } else {
                 return null;
             }
+        }
+
+        return deletedNodes;
+    }
+
+    public Set<Integer> rootClean(Set<Integer> nodes) {
+
+        if(nodes == null) {
+            nodes = new HashSet<>(nodeMap.keySet());
+        }
+        Set<Integer> deletedNodes = new HashSet<>();
+
+        for (Integer nodeId : nodes) {
+
+            // first we check if the node is still present
+            DirectedNode node = nodeMap.get(nodeId);
+            if (node == null) continue;
+
+            // if the node is a selfCycle we will remove it and reduce k
+            if (node.isSelfCycle()) {
+                removeNode(nodeId);
+                deletedNodes.add(nodeId);
+                continue;
+            }
+
+            // if the node is a sink or source we will remove it and recursively remove all newly
+            // created sinks and sources
+            if (node.isSinkSource()) {
+                removeSinkSource(nodeId);
+                continue;
+            }
+
+            // clean chains
+            if (node.isChain()) {
+                int temp = cleanChain(nodeId);
+                if (temp != -1) {
+                    deletedNodes.add(temp);
+                }
+                continue;
+            }
+
+            if (node.getInDegree() != node.getOutDegree() && Math.min(node.getInDegree(), node.getOutDegree()) == node.biDirectionalCount()) {
+                Set<Integer> inNodes = new HashSet<>(node.getInNodes());
+                Set<Integer> outNodes = new HashSet<>(node.getOutNodes());
+                if (outNodes.size() > inNodes.size()) {
+                    for (Integer outNode : outNodes) {
+                        if (!inNodes.contains(outNode)) {
+                            removeEdge(nodeId, outNode, false);
+                        }
+                    }
+                } else {
+                    for (Integer inNode : inNodes) {
+                        if (!outNodes.contains(inNode)) {
+                            removeEdge(inNode, nodeId, false);
+                        }
+                    }
+                }
+            }
+
+            // clean semi pendant triangle
+            Set<Integer> triangle = cleanSemiPendantTriangle(nodeId);
+            if (triangle != null) {
+                deletedNodes.addAll(triangle);
+            }
+
         }
 
         return deletedNodes;
@@ -592,10 +663,103 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return graphString.toString();
     }
 
+    public void quickClean(Set<Integer> nodes) {
+        for (Integer nodeId : nodes) {
+
+            // first we check if the node is still present
+            DirectedNode node = nodeMap.get(nodeId);
+            if (node == null) continue;
+
+            // if the node is a selfCycle we will remove it and reduce k
+            if (node.isSinkSource()) {
+                removeSinkSource(nodeId);
+            }
+        }
+    }
+
+    public Deque<Integer> findBestCycle(int limit, int sameCycleCount) {
+        for (Integer nodeId : nodeMap.keySet()) {
+            int twoCycleNodeId = getNode(nodeId).isTwoCycle();
+            if (twoCycleNodeId != -1) {
+                Deque<Integer> twoCycle = new ArrayDeque<>();
+                twoCycle.add(twoCycleNodeId);
+                twoCycle.add(nodeId);
+                return twoCycle;
+            }
+        }
+
+        int foundCycles = 0;
+
+        Map<Integer, Integer> cycleSizes = new HashMap<>();
+
+        Set<Integer> visited = new HashSet<>();
+        Map<Integer, Integer> parent = new HashMap<>();
+        Deque<Integer> cycle = new ArrayDeque<>();
+        for (Integer start : nodeMap.keySet()) {
+            if (visited.contains(start)) continue;
+            Deque<Integer> queue = new ArrayDeque<>();
+            Deque<Integer> tempCycle = new ArrayDeque<>();
+            queue.add(start);
+            visited.add(start);
+            while (!queue.isEmpty()) {
+                Integer currentNodeId = queue.pop();
+                for (Integer outNodeId : nodeMap.get(currentNodeId).getOutNodes()) {
+                    if (!visited.contains(outNodeId)) {
+                        parent.put(outNodeId, currentNodeId);
+                        visited.add(outNodeId);
+                        queue.add(outNodeId);
+                    }
+                    if (outNodeId.equals(start)) {
+                        int w = currentNodeId;
+                        while (w != start) {
+                            tempCycle.add(w);
+                            w = parent.get(w);
+                        }
+                        tempCycle.add(start);
+                    }
+                    if (!tempCycle.isEmpty()) break;
+                }
+                if (!tempCycle.isEmpty()) break;
+            }
+
+            int tempSize = tempCycle.size();
+            // If a 3-Cycle is found we return it directly
+            if (tempSize <= 3 && !tempCycle.isEmpty()) {
+                return tempCycle;
+            }
+
+            // Update best cycle
+            if (cycle.isEmpty() || (cycle.size() > tempSize && !tempCycle.isEmpty())) {
+                cycle = tempCycle;
+            }
+
+
+            // limit the amount of cycles
+            if (!cycle.isEmpty()) {
+                foundCycles++;
+                if (foundCycles >= limit) {
+                    return cycle;
+                }
+                if (!cycleSizes.containsKey(tempSize)){
+                    cycleSizes.put(tempSize, 1);
+                } else {
+                    cycleSizes.put(tempSize, cycleSizes.get(tempSize) + 1);
+                }
+
+                // if we found the same smallest cycle size X-Times we will return the best cycle.
+                if (cycleSizes.get(cycle.size()) >= sameCycleCount) {
+                    return cycle;
+                }
+            }
+
+        }
+        if (cycle.isEmpty()) return null;
+        return cycle;
+    }
+
+
     public Deque<Integer> findBestCycle() {
-        LinkedList<Integer> shuffledList = new LinkedList<>(nodeMap.keySet());
-        Collections.shuffle(shuffledList);
-        for (Integer nodeId : shuffledList) {
+        for (Integer nodeId : nodeMap.keySet()) {
             if (nodeMap.containsKey(nodeId) && !nodeMap.get(nodeId).isFixed()) {
                 int twoCycleNodeId = getNode(nodeId).isTwoCycle();
                 if (twoCycleNodeId != -1) {

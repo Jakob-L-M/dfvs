@@ -26,35 +26,51 @@ public class Packing {
         //System.out.println(g.size());
         //System.out.println(Main.dfvsSolve(g));
 
-        for (int runs =  0; runs < 10; runs++) {
-            for (int level = 0; level < 5; level++) {
-                for (int sccs = 1; sccs < 13; sccs+=2) {
-                    runParam(args[0], runs, level, sccs);
-                }
-            }
-        }
+        //for (int runs =  0; runs < 10; runs++) {
+          //  for (int level = 0; level < 5; level++) {
+            //    for (int sccs = 1; sccs < 13; sccs+=2) {
+              //      runParam(args[0], runs, level, sccs);
 
-        /*
+
         if (true) {
+            Set<String> jakobInst = new HashSet<>();
+            String[] jakobNames = new String[] {"h_119"};//"e_159","e_169","h_177","h_133","h_157","h_171","h_179","h_187","h_189"};
+            for (String inst : jakobNames) {
+                jakobInst.add(inst);
+            }
             try {
-            BufferedWriter writer = new BufferedWriter(new FileWriter("packingTimes"+"runs"+runs+"level"+level+"sccs"+sccs +".txt", true));
+            BufferedWriter writer = new BufferedWriter(new FileWriter("packingTimes.txt", true));
             writer.write("name heurK\n");
             File instances = new File("instances");
             for (File subInst : instances.listFiles()) {
-                if (subInst.getName().contains("sheet5") || !subInst.isDirectory()) continue;
+                if (!subInst.getName().contains("sheet5") || !subInst.isDirectory()) continue;
                 int count = 0;
                 for (File instance : subInst.listFiles()) {
+                    //if (!jakobInst.contains(instance.getName())) continue;
                     int best_heur = Integer.MAX_VALUE;
+                    int runs = 1;
                     int[] all_heurs = new int[runs];
+                    long singleTime = -System.nanoTime();
                     for (int i = 0; i < runs; i++) {
+                        if (instance.getName().contains("h_119")) continue;
                         DirectedGraph graph = new DirectedGraph(instance.getPath());
-                        int sol = graph.deathByPacking(level, sccs);
+                        Set<Integer> safeNodes = graph.rootClean();
+                        //Packing packing = new Packing(graph);
+                        //packing.getDigraphs();
+                        //safeNodes.addAll(packing.getSafeToDeleteDigraphNodes());
+                        //graph.removeAllNodes(safeNodes);
+                        //safeNodes.addAll(graph.rootClean(safeNodes));
+                        int sol = graph.deathByPacking(30, 4) + safeNodes.size();
                         all_heurs[i] = sol;
                         if (sol < best_heur) best_heur = sol;
                     }
-                    writer.write(instance.getName() + " " + best_heur + "\n");// + " out of " + Arrays.toString(all_heurs) + "\n");
-                    System.out.println("done");
+                    singleTime += System.nanoTime();
+                    System.out.println(instance.getName() + " time: " + singleTime);
+                    writer.write(instance.getPath() + " " + best_heur + "\n");// + " out of " + Arrays.toString(all_heurs) + "\n");
+                    System.out.println("done " + instance.getName());
                     //if (count > 100) break;
+
+
                     System.out.println("count: " + count++);
                 }
             }
@@ -72,7 +88,7 @@ public class Packing {
                 int[] all_heurs = new int[runs];
                 for (int i = 0; i < runs; i++) {
                     DirectedGraph graph = new DirectedGraph(args[0]);
-                    int sol = graph.deathByPacking();
+                    int sol = graph.deathByPacking(1,1);
                     all_heurs[i] = sol;
                     if (sol < best_heur) best_heur = sol;
                 }
@@ -83,7 +99,7 @@ public class Packing {
                 e.printStackTrace();
             }
         }
-        */
+
     }
 
     public static void runParam(String filename, int runs, int level, int sccs) {
@@ -142,6 +158,27 @@ public class Packing {
         }
         graph.rebuildGraph();
         return costlySubGraphs;
+    }
+
+    public List<Deque<Integer>> newFindCyclePacking(int cycleLimit, int sameCycleCount) {
+        graph.addStackCheckpoint();
+        List<Deque<Integer>> packing = new ArrayList<>();
+        Deque<Integer> cycle = graph.findBestCycle(cycleLimit, sameCycleCount);
+        while (cycle != null && !cycle.isEmpty()) {
+            packing.add(cycle);
+            for (Integer i : cycle) {
+                DirectedNode node = graph.nodeMap.get(i);
+                if (node != null) {
+                    Set<Integer> neighbours = new HashSet<>(node.getInNodes());
+                    neighbours.addAll(node.getOutNodes());
+                    graph.removeNode(i);
+                    graph.quickClean(neighbours);
+                }
+            }
+            cycle = graph.findBestCycle(cycleLimit, sameCycleCount);
+        }
+        graph.rebuildGraph();
+        return packing;
     }
 
     public List<Set<Integer>> getDigraphs() {
