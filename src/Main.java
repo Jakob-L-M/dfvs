@@ -298,18 +298,18 @@ public class Main {
 
         // #### DEVELOP ONLY ####
         String fileToRun = "instances/all_instances.txt";
-        String fileToSave = "./graph-metadata/graph_data3.csv";
+        String fileToSave = "./graph-metadata/graph_data4.csv";
         solSizes = utils.loadSolSizes();
 
         BufferedReader br = new BufferedReader(new FileReader(fileToRun));
 
 
-        Model m = utils.loadMatrix("./graph-metadata/synth_mat_v3.txt");
-        /*
-        BufferedWriter bw = new BufferedWriter(new FileWriter(fileToSave));
-        bw.write("instance,week,nodeId,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18\n");
+        Model m = utils.loadMatrix("./graph-metadata/synth_mat_v4.txt");
 
-         */
+        BufferedWriter bw = new BufferedWriter(new FileWriter(fileToSave));
+        bw.write("instance,week,nodeId,4,5,6,7,8,9,10,11,12,13,14,17,18\n");
+
+
         System.out.println("name \t k \t optK \t time");
         int offBySum = 0;
         int kSum = 0;
@@ -318,11 +318,12 @@ public class Main {
         while ((line = br.readLine()) != null) {
             String name = line.substring(line.indexOf("instances/") + 10);
             if (!solSizes.containsKey(name)) continue;
-            //if (!line.contains("complex3")) continue;
+            //if (line.contains("complex3")) continue;
             int optK = solSizes.get(name);
             if (optK < 0) {
                 continue;
             }
+            //createNodeData(15, utils.loadSolutions(), bw, line, name);
             DirectedGraph g = new DirectedGraph(line);
             g.k = Integer.MAX_VALUE;
             int k = g.cleanGraph().size();
@@ -337,7 +338,7 @@ public class Main {
             int offBy = k - optK;
             if (optK > 0) {
                 offBySum += offBy;
-                kSum += k;
+                kSum += optK;
 
                 if (k < optK) {
                     System.err.print("WRONG");
@@ -345,6 +346,7 @@ public class Main {
             }
             System.out.println(line.substring(line.lastIndexOf('\\') + 1) + "\t" + k + "\t" + optK + "\t" + offBy + "\t" + offBySum);
         }
+
 
         double sec = utils.round((double) (time+System.nanoTime())/1_000_000_000, 2);
         System.out.println("Took: " + (int) Math.floor(sec / 60) + ":" + utils.round(sec % 60, 2) + "min, in total off by: " + offBySum + " while total k's: " + kSum);
@@ -357,7 +359,7 @@ public class Main {
 
         // #### DEVELOP ONLY ####
 
-        //bw.close();
+        bw.close();
     }
 
     private static void runHeuristic(int iterations, String fileToRun, String fileToSave) throws IOException {

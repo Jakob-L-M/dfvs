@@ -703,7 +703,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 Tarjan tarjan = new Tarjan(this);
                 Set<DirectedGraph> sccs = tarjan.getSCCGraphs();
                 for (DirectedGraph scc : sccs) {
-                    if (scc.size() > 100) {
+                    if (scc.size() > 40) {
                         heurK += scc.deathByPacking(level, levelLimit + 1, m);
                     } else {
                         heurK += Main.dfvsSolve(scc, true).size();
@@ -711,7 +711,6 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 }
                 return heurK;
             }
-            int count = 0;
             Set<Integer> changedNodes = new HashSet<>();
             for (Deque<Integer> circle : remove) {
                 int nodeToDelete = circle.pop();
@@ -726,10 +725,9 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 if (prediction > 0.8 - 0.1*level) {
                     removeNode(nodeToDelete);
                     changedNodes.add(nodeToDelete);
-                    count++;
                 }
             }
-            heurK += count;
+            heurK += changedNodes.size();
             heurK += cleanGraph().size();
             remove = pack.newFindCyclePacking(5, 3);
             level++;
@@ -1044,12 +1042,6 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
      */
     public List<Double> getNodeMetaData(int nodeId) {
 
-        if (inPositions.isEmpty()) {
-            updatePositions();
-        } else if (Math.random() > 0.8) {
-            updatePositions();
-        }
-
         List<Double> res = new ArrayList<>();
 
         int n = nodeMap.size();
@@ -1107,9 +1099,6 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         res.add(noBiOutDegree);
 
         res.add(utils.round((double) calculatePetal(nodeId, 3).getValue() / n, 8));
-
-        res.add(getRelativeInRank(nodeId));
-        res.add(getRelativeOutRank(nodeId));
 
         return res;
     }
