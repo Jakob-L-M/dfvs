@@ -5,6 +5,12 @@ import java.util.*;
 
 public class Main {
 
+    private static final int petalK = 4;
+    private static final int petalRec = 16;
+    private static final boolean petalEnabled = true;
+    private static final int costK = 9;
+    private static final int costRec = 49;
+    private static final boolean costEnabled = true;
     public static int recursions;
     public static long rootTime;
     public static long cleaningTime;
@@ -14,19 +20,12 @@ public class Main {
     public static int firstLowerbound;
     public static List<Set<Integer>> fullDigraphs;
     public static Map<String, Integer> solSizes;
-    public static Map<String, Integer> solSizes3;
     public static Map<String, List<Double>> timeMap;
     public static Map<String, List<Integer>> recMap;
     public static GRBEnv env;
-    private static final int petalK = 4;
-    private static final int petalRec = 16;
-    private static final boolean petalEnabled = true;
-    private static final int costK = 9;
-    private static final int costRec = 49;
-    private static final boolean costEnabled = true;
     private static boolean interrupt;
 
-    public static Set<Integer> dfvsBranch(DirectedGraph graph) {
+    public static Set<Integer> dfvsBranch(DirectedGraph graph, boolean needsClean) {
 
         if (interrupt) {
             return null;
@@ -35,103 +34,31 @@ public class Main {
         recursions++;
 
         // clean the graph if the budget limit is reached we can break here
-        Set<Integer> cleanedNodes = graph.cleanGraph();
+        Set<Integer> cleanedNodes = new HashSet<>();
+        if (needsClean) {
+            cleanedNodes = graph.cleanGraph();
 
-        if (cleanedNodes == null) {
-            return null;
-        }
-
-        Packing packing = null;
-        if (petalEnabled && graph.k > petalK && recursions % petalRec == 0) { // 3 && graph.k <= Math.sqrt(graph.nodeMap.size()) - 1) {
-            int maxPetal = -1;
-            int maxPetalId = -1;
-            Set<Integer> petalSet = null;
-            for (Integer nodeId : new HashSet<>(graph.nodeMap.keySet())) {
-                // all petals will be greater than 0 after the cleaning cycle.
-                if (graph.nodeMap.get(nodeId).getPedal() > maxPetal) {
-                    Tuple currentFlower = graph.calculatePetal(nodeId);
-                    // if the found petal is still larger we will update the maximum flower
-                    if (currentFlower.getValue() > maxPetal) {
-                        maxPetalId = nodeId;
-                        maxPetal = currentFlower.getValue();
-                        petalSet = currentFlower.getSet();
-                    }
-                }
-            }
-
-            if (maxPetalId != -1) {
-                graph.addStackCheckpoint();
-                graph.removeAllNodes(petalSet);
-                packing = new Packing(graph);
-                int tempK = graph.k;
-                graph.k = 1000000;
-                graph.cleanGraph();
-                if (tempK - packing.findCyclePacking().size() + graph.solution.size() < maxPetal) {
-
-                    graph.rebuildGraph();
-                    graph.k = tempK;
-                    graph.removeNode(maxPetalId);
-                    cleanedNodes.add(maxPetalId);
-                    graph.k--;
-
-                    cleanedNodes.addAll(graph.solution);
-                    graph.solution.clear();
-
-                    Set<Integer> newDeletedNodes = graph.cleanGraph();
-                    if (newDeletedNodes == null) {
-                        return null;
-                    }
-                    cleanedNodes.addAll(newDeletedNodes);
-
-                } else {
-                    graph.rebuildGraph();
-                    graph.k = tempK;
-                }
-            }
-        }
-
-        if (graph.k < 0) {
-            return null;
-        }
-
-        if (costEnabled && graph.k > costK && recursions % costRec == 0) {
-
-            packing = new Packing(graph);
-            packing.getDigraphs();
-            Set<Integer> safeDiGraphNodes = packing.getSafeToDeleteDigraphNodes();
-            if (safeDiGraphNodes.size() > graph.k) {
+            if (cleanedNodes == null) {
                 return null;
             }
-            if (!safeDiGraphNodes.isEmpty()) {
-                graph.k = graph.k - safeDiGraphNodes.size();
-                graph.removeAllNodes(safeDiGraphNodes);
-                cleanedNodes.addAll(safeDiGraphNodes);
 
-                Set<Integer> newDeletedNodes = graph.cleanGraph();
-                if (newDeletedNodes == null || graph.k < 0) {
-                    return null;
-                }
-                cleanedNodes.addAll(newDeletedNodes);
-
-                cleanedNodes.addAll(graph.solution);
-                graph.solution.clear();
+            if (graph.k < 0) {
+                return null;
             }
         }
 
-        if (graph.k < 0) {
+        Packing packing = new Packing(graph);
+
+        if (packing.newFindCyclePacking(6, 2).size() > graph.k) {
             return null;
         }
 
-        if (packing == null) {
-            packing = new Packing(graph);
-        }
-        if (Math.max(packing.findCyclePacking().size(), packing.lowerDigraphBound()) > graph.k) {
-            return null;
-        }
-
-        List<Set<Integer>> remainingDigraphs = graph.cleanDigraphSet(fullDigraphs);
         Set<Integer> digraph = null;
-        if (!remainingDigraphs.isEmpty()) {
+        List<Set<Integer>> remainingDigraphs = null;
+        if (fullDigraphs != null) {
+            remainingDigraphs = graph.cleanDigraphSet(fullDigraphs);
+        }
+        if (remainingDigraphs != null && !remainingDigraphs.isEmpty()) {
             digraph = remainingDigraphs.iterator().next();
         }
         if (digraph != null && digraph.size() > 1) {
@@ -147,7 +74,7 @@ public class Main {
                 // -cleanedNodes.size(): nodes that where removed during graph reduction
                 int kPrev = graph.k;
                 graph.k = graph.k - digraphWithoutV.size();
-                Set<Integer> dfvs = dfvsBranch(graph);
+                Set<Integer> dfvs = dfvsBranch(graph, true);
 
                 // if there is a valid solution in the recursion it will be returned
                 if (dfvs != null) {
@@ -160,15 +87,12 @@ public class Main {
                 } else {
                     graph.rebuildGraph();
                     graph.k = kPrev;
-                    graph.getNode(v).fixNode();
                 }
             }
         } else {
             // find a Cycle
-            graph.solution.clear();
+            graph.quickClean(new HashSet<>(graph.nodeMap.keySet()));
             Deque<Integer> cycle = graph.findBestCycle();
-            cleanedNodes.addAll(graph.solution);
-            graph.solution.clear();
 
             if (cycle == null && graph.k >= 0) {
                 // The graph does not have any cycles
@@ -181,26 +105,31 @@ public class Main {
             }
 
 
-            Map<Integer, List<Integer>> sortedCycle = new HashMap<>();
+            Map<Integer, List<Integer>> sortedCycle = new TreeMap<>();
             for (Integer v : cycle) {
-                graph.calculatePetal(v);
-                if (!sortedCycle.containsKey(graph.getNode(v).getPedal())) {
-                    sortedCycle.put(graph.getNode(v).getPedal(), new ArrayList<>());
+                int value = graph.getNode(v).getInDegree()*graph.getNode(v).getOutDegree();
+                if (!sortedCycle.containsKey(value)) {
+                    sortedCycle.put(value, new ArrayList<>());
                 }
-                sortedCycle.get(graph.getNode(v).getPedal()).add(v);
+                sortedCycle.get(value).add(v);
             }
-            List<Integer> pedalValues = new ArrayList<>(sortedCycle.keySet());
-            pedalValues.sort(Collections.reverseOrder());
+            List<Integer> branchCycle = new ArrayList<>(sortedCycle.keySet());
+            branchCycle.sort(Collections.reverseOrder());
 
 
-            for (Integer i : pedalValues) {
+            for (Integer i : branchCycle) {
 
-                for (Integer v : sortedCycle.get(i)) {
+                for (Integer nodeToDelete : sortedCycle.get(i)) {
 
                     // delete a vertex of the circle and branch for here
 
                     graph.addStackCheckpoint();
-                    graph.removeNode(v);
+
+                    Set<Integer> neighbours = new HashSet<>(graph.nodeMap.get(nodeToDelete).getInNodes());
+                    neighbours.addAll(graph.nodeMap.get(nodeToDelete).getOutNodes());
+                    graph.removeNode(nodeToDelete);
+                    graph.quickClean(neighbours);
+
                     int kPrev = graph.k;
                     graph.k--;
 
@@ -208,20 +137,19 @@ public class Main {
                     // branch with a maximum cost of k
                     // -1: Just deleted a node
                     // -cleanedNodes.size(): nodes that where removed during graph reduction
-                    Set<Integer> dfvs = dfvsBranch(graph);
+                    Set<Integer> dfvs = dfvsBranch(graph, false);
 
                     // if there is a valid solution in the recursion it will be returned
                     if (dfvs != null) {
 
                         // Add the nodeId of the valid solution and all cleanedNodes
-                        dfvs.add(v);
+                        dfvs.add(nodeToDelete);
                         dfvs.addAll(cleanedNodes);
 
                         return dfvs;
                     } else {
                         graph.rebuildGraph();
                         graph.k = kPrev;
-                        graph.getNode(v).fixNode();
                     }
                 }
             }
@@ -229,24 +157,38 @@ public class Main {
         return null;
     }
 
+    public static Set<Integer> dfvsSolve(DirectedGraph graph, boolean isScc) {
+            Packing p = new Packing(graph);
+            int k = p.newFindCyclePacking(5, 2).size();
+
+            fullDigraphs = p.getDigraphs();
+
+            Set<Integer> dfvs = null;
+            while (dfvs == null) {
+                graph.addStackCheckpoint();
+                graph.k = k;
+                dfvs = dfvsBranch(graph, true);
+                k++;
+                graph.rebuildGraph();
+            }
+        return dfvs;
+    }
+
     public static Set<Integer> dfvsSolve(DirectedGraph graph) {
-        rootTime = -System.nanoTime();
+        graph.k = Integer.MAX_VALUE;
+        Set<Integer> allDfvs = new HashSet<>(graph.cleanGraph());
+        graph.k = 0;
+
         Packing packing = new Packing(graph);
-        packing.getDigraphs();
-        Set<Integer> newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
-        graph.removeAllNodes(newDeletedNodes);
-        Set<Integer> allDfvs = new HashSet<>(newDeletedNodes);
-        while (!newDeletedNodes.isEmpty()) {
-            packing = new Packing(graph);
-            packing.getDigraphs();
-            newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
-            graph.removeAllNodes(newDeletedNodes);
-            allDfvs.addAll(newDeletedNodes);
-        }
+        Set<Integer> safeDigraphs = packing.getSafeToDeleteDigraphNodes(true);
+        graph.removeAllNodes(safeDigraphs);
+        allDfvs.addAll(safeDigraphs);
 
         graph.k = Integer.MAX_VALUE;
         allDfvs.addAll(graph.cleanGraph());
         graph.k = 0;
+
+        //System.out.println(graph);
 
         graph.clearStack();
         Set<DirectedGraph> SCCs = new Tarjan(graph).getSCCGraphs();
@@ -254,19 +196,24 @@ public class Main {
         rootTime += System.nanoTime();
         for (DirectedGraph scc : SCCs) {
 
+            allDfvs.addAll(scc.cleanGraph());
+
             Packing sccPacking = new Packing(scc);
-            int k = sccPacking.findCyclePacking().size();
-            fullDigraphs = sccPacking.getDigraphs();
+            int k = sccPacking.newFindCyclePacking().size();
+            if (k == 0) {
+                scc.cleanGraph();
+            }
+            List<Set<Integer>> digraphs = sccPacking.getDigraphs();
 
             Set<Integer> dfvs = null;
 
             while (dfvs == null && !interrupt) {
+                fullDigraphs = new ArrayList<>(digraphs);
                 scc.addStackCheckpoint();
                 scc.k = k;
-                dfvs = dfvsBranch(scc);
+                dfvs = dfvsBranch(scc, true);
                 k++;
                 scc.rebuildGraph();
-                scc.unfixAll();
             }
 
             if (interrupt) {
@@ -346,25 +293,74 @@ public class Main {
         env.start();
 
         // #### GUROBI END ####
-
  */
         //productionMain(args[0]);
 
         // #### DEVELOP ONLY ####
-        int iterations = 10;
         String fileToRun = "instances/all_instances.txt";
-        String fileToSave = "./graph-metadata/synth_net_v2.csv";
+        String fileToSave = "./graph-metadata/graph_data3.csv";
         solSizes = utils.loadSolSizes();
-        solSizes3 = utils.loadSolSizes3();
 
+        BufferedReader br = new BufferedReader(new FileReader(fileToRun));
+
+
+        Model m = utils.loadMatrix("./graph-metadata/synth_mat_v3.txt");
         /*
-        BufferedWriter bw = new BufferedWriter(new FileWriter("./graph-metadata/vertices.csv"));
+        BufferedWriter bw = new BufferedWriter(new FileWriter(fileToSave));
+        bw.write("instance,week,nodeId,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18\n");
 
-        bw.write("instance,week,nodeId,inDegree,outDegree,maxInOut,minInOut," +
-                "inInDegree,inOutDegree,outOutDegree,outInDegree," +
-                "biDirDegree,noBiInDegree,noBiOutDegree,petal3,relInPos,relOutPos");
-        bw.write("\n");
-        */
+         */
+        System.out.println("name \t k \t optK \t time");
+        int offBySum = 0;
+        int kSum = 0;
+        long time = -System.nanoTime();
+        String line;
+        while ((line = br.readLine()) != null) {
+            String name = line.substring(line.indexOf("instances/") + 10);
+            if (!solSizes.containsKey(name)) continue;
+            //if (!line.contains("complex3")) continue;
+            int optK = solSizes.get(name);
+            if (optK < 0) {
+                continue;
+            }
+            DirectedGraph g = new DirectedGraph(line);
+            g.k = Integer.MAX_VALUE;
+            int k = g.cleanGraph().size();
+            Packing p = new Packing(g);
+            Set<Integer> safeDigraphs = p.getSafeToDeleteDigraphNodes(true);
+            g.removeAllNodes(safeDigraphs);
+            k += g.cleanGraph().size();
+
+            k += safeDigraphs.size();
+            g.k = 0;
+            k += g.deathByPacking(0,6, m);
+            int offBy = k - optK;
+            if (optK > 0) {
+                offBySum += offBy;
+                kSum += k;
+
+                if (k < optK) {
+                    System.err.print("WRONG");
+                }
+            }
+            System.out.println(line.substring(line.lastIndexOf('\\') + 1) + "\t" + k + "\t" + optK + "\t" + offBy + "\t" + offBySum);
+        }
+
+        double sec = utils.round((double) (time+System.nanoTime())/1_000_000_000, 2);
+        System.out.println("Took: " + (int) Math.floor(sec / 60) + ":" + utils.round(sec % 60, 2) + "min, in total off by: " + offBySum + " while total k's: " + kSum);
+
+        //createGraphData(fileToRun, fileToSave);
+
+        //runHeuristic(20, fileToRun, fileToSave);
+
+        //runHeuristic(20, "instances/sheet5_instances.txt", "./graph-metadata/random_all_2.csv");
+
+        // #### DEVELOP ONLY ####
+
+        //bw.close();
+    }
+
+    private static void runHeuristic(int iterations, String fileToRun, String fileToSave) throws IOException {
         BufferedWriter bw = new BufferedWriter(new FileWriter(fileToSave));
 
         bw.write("instance");
@@ -374,7 +370,7 @@ public class Main {
         bw.write(",maxTime\n");
 
         BufferedReader br = new BufferedReader(new FileReader(fileToRun));
-        int numberOfInstances = (int)br.lines().count();
+        int numberOfInstances = (int) br.lines().count();
         int c = 0;
         br = new BufferedReader(new FileReader(fileToRun));
         String instance = br.readLine();
@@ -384,10 +380,12 @@ public class Main {
         while (instance != null) {
             c++;
 
-            String name = instance.substring(instance.indexOf("instances/")+10);
-            System.out.println(c + "/" + numberOfInstances + ": " +  name);
+            String name = instance.substring(instance.indexOf("instances/") + 10);
+
+            System.out.println(c + "/" + numberOfInstances + ": " + name);
 
             long maxTime = 0;
+            int bestK = Integer.MAX_VALUE;
             bw.write(name);
             System.out.print("\t\t|");
             for (int j = 0; j < iterations; j++) {
@@ -398,13 +396,13 @@ public class Main {
                 long time = -System.nanoTime();
 
                 // Put Heuristic here
-                int k = NNHeuristic(instance, m);
+                int k = randomHeuristic(instance);
 
                 time += System.nanoTime();
                 if (time > maxTime) {
                     maxTime = time;
                 }
-                bw.write(","+ k);
+                bw.write("," + k);
 
                 // Progress Bar
                 for (int j = 0; j < iterations + 1; j++) {
@@ -413,17 +411,26 @@ public class Main {
                 for (int j = 0; j <= i; j++) {
                     System.out.print("█");
                 }
-                for (int j = i+1; j < iterations; j++) {
+                for (int j = i + 1; j < iterations; j++) {
                     System.out.print("-");
                 }
                 System.out.print("|");
+
+                if (k < bestK) {
+                    bestK = k;
+                }
                 //Progress Bar end
 
             }
-            double mTime = utils.round((double)maxTime/1_000_000_000, 4);
+            double mTime = utils.round((double) maxTime / 1_000_000_000, 4);
             bw.write("," + mTime + "\n");
             bw.flush();
-            System.out.println("\t max time: " + mTime + "sec");
+            System.out.print("\t max time: " + mTime + "sec");
+            System.out.print("\tbestK: " + bestK);
+            if (solSizes.containsKey(name) && solSizes.get(name) != -1) {
+                System.out.print("\toptK:" + solSizes.get(name));
+            }
+            System.out.println("");
 
 
             //createNodeData(iterations, solutions, bw, instance, name);
@@ -431,32 +438,24 @@ public class Main {
         }
 
         bw.close();
-
-        //System.out.println("Validation passed");
-
-
-
-
-        //runILP(instanceFile, timelimit);
-        // #### VALIDATE INSTANCES ####
-
-        // #### DEVELOP ONLY ####
-
-
     }
 
     private static void createNodeData(int iterations, Map<String, List<Integer>> solutions, BufferedWriter bw, String instance, String name) throws IOException {
         DirectedGraph g = new DirectedGraph(instance);
+        g.k = Integer.MAX_VALUE;
+        g.cleanGraph();
+        Packing p = new Packing(g);
+        g.removeAllNodes(p.getSafeToDeleteDigraphNodes(true));
+        if (!solutions.containsKey(name)) return;
+        List<Integer> sol = new ArrayList<>(solutions.get(name));
         for (int i = 0; i < iterations; i++) {
-            List<Integer> sol = new ArrayList<>(solutions.get(name));
-            int b = new Random().nextInt(sol.size() - 1);
+            int b = new Random().nextInt( Math.max(1, sol.size() - 2));
             Collections.shuffle(sol);
             for (int j = 0; j < b; j++) {
                 g.removeNode(sol.get(j));
             }
-            g.rootClean();
+            g.cleanGraph();
             g.extractNodeMetaData(bw);
-
         }
     }
 
@@ -471,14 +470,6 @@ public class Main {
 
             String instanceName = instance.substring(instance.indexOf("instances/") + 10);
             String name = instanceName.substring(0, instanceName.indexOf("/"));
-            int optk;
-            if (name.contains("3")) {
-                optk = solSizes3.get(instance.substring(instance.lastIndexOf("/") + 1));
-                instance = br.readLine();
-                continue;
-            } else {
-                optk = solSizes.get(instance.substring(instance.lastIndexOf("/") + 1));
-            }
 
             DirectedGraph graph = new DirectedGraph(instance);
 
@@ -519,20 +510,8 @@ public class Main {
             }
             System.out.print(instance);
             if (k == null) {
-                if (optk == -1) {
-                    // Yellow: a timeout that also has no known solution
-                    System.out.print("\u001B[33m !both Timeouts! \u001B[0m");
-                }
                 System.out.println(";-1;" + fileSec + ";" + cleanSec + ";" + digraphSec + ";" + timelimit + ";[]");
             } else {
-
-                if (optk == -1) {
-                    // Green: a Solution with no known optimal Solution.
-                    System.out.print("\u001B[32m !Solution unkown! \u001B[0m");
-                } else if (optk != k.size() + kClean) {
-                    // Red: an incorrect Solution
-                    System.out.print("\u001B[31m !Incorrect Solution! \u001B[0m");
-                }
 
                 double sec = utils.round((time + System.nanoTime()) / 1_000_000_000.0, 4);
                 System.out.println(";" + (k.size() + kClean) + ";" + fileSec + ";" + cleanSec + ";" + digraphSec + ";" + sec + ";" + k);
@@ -587,12 +566,24 @@ public class Main {
         return null;
     }
 
-    private static String randomHeuristic(String file) {
-        DirectedGraph g = new DirectedGraph(file);
-
-        long time = -System.nanoTime();
+    private static int randomHeuristic(String file) {
+        DirectedGraph g;
+        if (file.contains("sheet5")) {
+            g = new DirectedGraph(file, true);
+        } else {
+            g = new DirectedGraph(file);
+        }
 
         Set<Integer> k = g.rootClean();
+
+        Packing p = new Packing(g);
+        p.getDigraphs();
+        Set<Integer> safeToDelete = p.getSafeToDeleteDigraphNodes();
+        if (!safeToDelete.isEmpty()) {
+            g.removeAllNodes(safeToDelete);
+            k.addAll(safeToDelete);
+            k.addAll(g.rootClean());
+        }
 
         while (!g.nodeMap.isEmpty()) {
             Set<Integer> set = g.nodeMap.keySet();
@@ -602,16 +593,23 @@ public class Main {
                 it.next();
             }
             int nodeToDelete = it.next();
+
+            Set<Integer> neighbours = new HashSet<>(g.nodeMap.get(nodeToDelete).getOutNodes());
+            neighbours.addAll(g.nodeMap.get(nodeToDelete).getInNodes());
             g.removeNode(nodeToDelete);
             k.add(nodeToDelete);
-            k.addAll(g.rootClean());
+            k.addAll(g.rootClean(neighbours, true));
         }
-        double sec = utils.round((double)(time+System.nanoTime())/1_000_000_000, 4);
-        return "" + k.size();
+        return k.size();
     }
 
     private static int NNHeuristic(String file, Model model) {
-        DirectedGraph g = new DirectedGraph(file);
+        DirectedGraph g;
+        if (file.contains("sheet5")) {
+            g = new DirectedGraph(file, true);
+        } else {
+            g = new DirectedGraph(file);
+        }
 
         Set<Integer> k = g.rootClean();
 
@@ -634,5 +632,38 @@ public class Main {
         }
 
         return k.size();
+    }
+
+    private static void createGraphData(String fileFrom, String fileTo) {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(fileFrom));
+            BufferedWriter bw = new BufferedWriter(new FileWriter((fileTo)));
+            String instance;
+            while ((instance = br.readLine()) != null) {
+                String name = instance.substring(instance.indexOf("instances/") + 10);
+                DirectedGraph g = new DirectedGraph(instance);
+
+                g.rootClean();
+                Packing p = new Packing(g);
+                p.getDigraphs();
+                g.removeAllNodes(p.getSafeToDeleteDigraphNodes());
+                g.rootClean(null, true);
+
+                System.out.println(name);
+                if (g.nodeMap.size() == 0) {
+                    continue;
+                }
+                bw.write(name);
+                List<Double> value = g.extractGraphMetaData();
+                for (double v : value) {
+                    bw.write("," + utils.round(v, 6));
+                }
+                bw.write("\n");
+            }
+            bw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
     }
 }

@@ -118,8 +118,8 @@ public class Packing {
     public List<Deque<Integer>> newFindCyclePacking(int limit, int sameCycleCount) {
         graph.addStackCheckpoint();
         List<Deque<Integer>> packing = new ArrayList<>();
-        Deque<Integer> cycle = graph.findBestCycle(limit, sameCycleCount);
-        while (cycle != null && !cycle.isEmpty()) {
+        Deque<Integer> cycle = graph.findBestCycle(sameCycleCount, limit);
+        while (cycle != null) {
             packing.add(cycle);
             for (Integer i : cycle) {
                 DirectedNode node = graph.nodeMap.get(i);
