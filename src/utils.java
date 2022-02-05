@@ -77,6 +77,18 @@ public class utils {
                 }
                 line = br.readLine();
             }
+            br = new BufferedReader(new FileReader("instances/best_known_solutions.txt"));
+            line = br.readLine();
+            while (line != null) {
+                String[] temp = line.split("\\s+");
+                try {
+                    res.put(temp[0], Integer.valueOf(temp[1]));
+                } catch (NumberFormatException e) {
+                    // catching timeout instances
+                    res.put(temp[0], -1);
+                }
+                line = br.readLine();
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -113,6 +125,7 @@ public class utils {
                 }
                 line = br.readLine();
             }
+            br.close();
             return new Model(weights, biases, 0.1);
         } catch (IOException e) {
             e.printStackTrace();
@@ -140,11 +153,33 @@ public class utils {
                 res.put(name, sol);
                 line = br.readLine();
             }
+
+            br = new BufferedReader(new FileReader("graph-metadata/week5_small_sol.csv"));
+            br.readLine(); // skip column name line
+
+            line = br.readLine();
+
+            while (line != null) {
+                String s = line.substring(line.lastIndexOf(';') + 1);
+                String name = line.substring(0, line.indexOf(';'));
+                s = s.replace("[", "").replace("]", "");
+                String[] splits = s.split(", ");
+                List<Integer> sol = new ArrayList<>();
+                for (String split : splits) {
+                    sol.add(Integer.valueOf(split));
+                }
+                res.put(name, sol);
+                line = br.readLine();
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
 
         return res;
+    }
+
+    public static double getSeconds(long timestamp, int decimals) {
+        return utils.round((double)(timestamp + System.nanoTime())/1_000_000_000, decimals);
     }
 
 }

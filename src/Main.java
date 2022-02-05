@@ -107,7 +107,7 @@ public class Main {
 
             Map<Integer, List<Integer>> sortedCycle = new TreeMap<>();
             for (Integer v : cycle) {
-                int value = graph.getNode(v).getInDegree()*graph.getNode(v).getOutDegree();
+                int value = graph.getNode(v).getInDegree() * graph.getNode(v).getOutDegree();
                 if (!sortedCycle.containsKey(value)) {
                     sortedCycle.put(value, new ArrayList<>());
                 }
@@ -158,19 +158,19 @@ public class Main {
     }
 
     public static Set<Integer> dfvsSolve(DirectedGraph graph, boolean isScc) {
-            Packing p = new Packing(graph);
-            int k = p.newFindCyclePacking(5, 2).size();
+        Packing p = new Packing(graph);
+        int k = p.newFindCyclePacking(5, 2).size();
 
-            fullDigraphs = p.getDigraphs();
+        fullDigraphs = p.getDigraphs();
 
-            Set<Integer> dfvs = null;
-            while (dfvs == null) {
-                graph.addStackCheckpoint();
-                graph.k = k;
-                dfvs = dfvsBranch(graph, true);
-                k++;
-                graph.rebuildGraph();
-            }
+        Set<Integer> dfvs = null;
+        while (dfvs == null) {
+            graph.addStackCheckpoint();
+            graph.k = k;
+            dfvs = dfvsBranch(graph, true);
+            k++;
+            graph.rebuildGraph();
+        }
         return dfvs;
     }
 
@@ -247,42 +247,33 @@ public class Main {
         recursions = 0;
     }
 
-    public static void productionMain(String args) throws GRBException {
+    public static void productionMain(String args) {
         DirectedGraph graph = new DirectedGraph(args);
 
-        Set<Integer> cleanedNodes = graph.rootClean();
+        graph.k = Integer.MAX_VALUE;
+        Set<Integer> solution = graph.cleanGraph();
 
         Packing packing = new Packing(graph);
+        Set<Integer> safeToDeleteDigraph = packing.getSafeToDeleteDigraphNodes(true);
 
-        List<Set<Integer>> digraphs = packing.getDigraphs();
-        Set<Integer> safeToDeleteDigraph = packing.getSafeToDeleteDigraphNodes();
-
-        cleanedNodes.addAll(safeToDeleteDigraph);
+        solution.addAll(safeToDeleteDigraph);
         graph.removeAllNodes(safeToDeleteDigraph);
 
-        cleanedNodes.addAll(graph.rootClean());
+        solution.addAll(graph.cleanGraph());
 
-        digraphs = graph.cleanDigraphSet(digraphs);
+        Model m = utils.loadMatrix("mat.txt");
+        Set<Integer> res = graph.deathByPacking(0, 1, m).getSolution();
 
-        List<Integer> k = new ArrayList<>();
-        if (graph.nodeMap.size() > 0) {
-            String filename = "./" + args.substring(args.lastIndexOf('/') + 1) + ".lp";
-            graph.createTopoLPFile(filename, digraphs);
-            k = ilp(filename, Double.MAX_VALUE);
-        }
-        if (k != null) {
-            for (Integer i : k) {
-                System.out.println(i);
-            }
-            for (Integer i : cleanedNodes) {
-                System.out.println(i);
-            }
+        solution.addAll(res);
+
+        for (Integer i : solution) {
+            System.out.println(i);
         }
     }
 
     public static void main(String[] args) throws IOException, GRBException {
 
-/*
+
         // #### GUROBI ####
         System.out.print("# ");
 
@@ -293,21 +284,50 @@ public class Main {
         env.start();
 
         // #### GUROBI END ####
- */
-        //productionMain(args[0]);
 
+        productionMain(args[0]);
         // #### DEVELOP ONLY ####
+
+        //heuristic();
+
+    }
+
+    private static void nodesMeta() throws IOException {
         String fileToRun = "instances/all_instances.txt";
-        String fileToSave = "./graph-metadata/graph_data4.csv";
+        String fileToSave = "./results/nodes_v5.csv";
+
+        Map<String, List<Integer>> solutions = utils.loadSolutions();
+        System.out.println(solutions.get("sheet5-heuristic/e_005"));
+
+        BufferedReader br = new BufferedReader(new FileReader(fileToRun));
+
+        BufferedWriter bw = new BufferedWriter(new FileWriter(fileToSave));
+
+        bw.write("instance,w,nodeId,1,2,3,4,5,6,7,8,9,10,11\n");
+        String line;
+        while ((line = br.readLine()) != null) {
+            String name = line.substring(line.indexOf("instances/") + 10);
+            if (!solutions.containsKey(name)) continue;
+            System.out.println(name);
+            createNodeData(15,solutions,bw,line,name);
+        }
+    }
+
+    private static void heuristic() throws IOException {
+        String fileToRun = "instances/all_instances.txt";
+        String fileToSave = "./results/net_heur_v6.csv";
+
+        int totalInst = 1313;
+        int c = 0;
         solSizes = utils.loadSolSizes();
 
         BufferedReader br = new BufferedReader(new FileReader(fileToRun));
 
-
-        Model m = utils.loadMatrix("./graph-metadata/synth_mat_v4.txt");
-
         BufferedWriter bw = new BufferedWriter(new FileWriter(fileToSave));
-        bw.write("instance,week,nodeId,4,5,6,7,8,9,10,11,12,13,14,17,18\n");
+
+        bw.write("instance,k,time\n");
+
+        Model m = utils.loadMatrix("./graph-metadata/mat_v6.txt");
 
 
         System.out.println("name \t k \t optK \t time");
@@ -315,15 +335,16 @@ public class Main {
         int kSum = 0;
         long time = -System.nanoTime();
         String line;
+        Timer mainTimer = new Timer(6, new String[]{"packing", "predData", "predictions", "cleaning", "dfvsSolve", "tarjan"});
         while ((line = br.readLine()) != null) {
+            c++;
             String name = line.substring(line.indexOf("instances/") + 10);
-            if (!solSizes.containsKey(name)) continue;
-            //if (line.contains("complex3")) continue;
-            int optK = solSizes.get(name);
-            if (optK < 0) {
-                continue;
-            }
-            //createNodeData(15, utils.loadSolutions(), bw, line, name);
+
+            int optK = solSizes.getOrDefault(name, -1);
+
+            if (!line.substring(0, line.lastIndexOf('/')).contains("5")) continue;
+
+            long t = -System.nanoTime();
             DirectedGraph g = new DirectedGraph(line);
             g.k = Integer.MAX_VALUE;
             int k = g.cleanGraph().size();
@@ -334,114 +355,118 @@ public class Main {
 
             k += safeDigraphs.size();
             g.k = 0;
-            k += g.deathByPacking(0,6, m);
+            TimerTuple res = g.deathByPacking(0, 1, m);
+            mainTimer.addTimer(res.getTimer());
+            k += res.getSolution().size();
             int offBy = k - optK;
             if (optK > 0) {
                 offBySum += offBy;
                 kSum += optK;
-
-                if (k < optK) {
-                    System.err.print("WRONG");
-                }
             }
-            System.out.println(line.substring(line.lastIndexOf('\\') + 1) + "\t" + k + "\t" + optK + "\t" + offBy + "\t" + offBySum);
+            double s = utils.getSeconds(t, 4);
+            bw.write(name + "," + k + "," + s + "\n");
+            System.out.print(c + "/" + totalInst + "\t" + name + "\t" + k + "\t" + optK + "\t" + offBy + "\t" + offBySum);
+            System.out.println("\t" + res.getTimer());
+            bw.flush();
         }
 
 
-        double sec = utils.round((double) (time+System.nanoTime())/1_000_000_000, 2);
+        double sec = utils.round((double) (time + System.nanoTime()) / 1_000_000_000, 2);
         System.out.println("Took: " + (int) Math.floor(sec / 60) + ":" + utils.round(sec % 60, 2) + "min, in total off by: " + offBySum + " while total k's: " + kSum);
-
+        System.out.println("Total Time dist: " + mainTimer);
         //createGraphData(fileToRun, fileToSave);
 
         //runHeuristic(20, fileToRun, fileToSave);
 
         //runHeuristic(20, "instances/sheet5_instances.txt", "./graph-metadata/random_all_2.csv");
 
+        bw.close();
         // #### DEVELOP ONLY ####
-
-        bw.close();
     }
 
-    private static void runHeuristic(int iterations, String fileToRun, String fileToSave) throws IOException {
-        BufferedWriter bw = new BufferedWriter(new FileWriter(fileToSave));
+    /*
 
-        bw.write("instance");
-        for (int i = 0; i < iterations; i++) {
-            bw.write(",k" + i);
-        }
-        bw.write(",maxTime\n");
+   private static void runHeuristic(int iterations, String fileToRun, String fileToSave) throws IOException {
+       BufferedWriter bw = new BufferedWriter(new FileWriter(fileToSave));
 
-        BufferedReader br = new BufferedReader(new FileReader(fileToRun));
-        int numberOfInstances = (int) br.lines().count();
-        int c = 0;
-        br = new BufferedReader(new FileReader(fileToRun));
-        String instance = br.readLine();
+       bw.write("instance");
+       for (int i = 0; i < iterations; i++) {
+           bw.write(",k" + i);
+       }
+       bw.write(",maxTime\n");
 
-        Model m = utils.loadMatrix("graph-metadata/synth_mat_v2.txt");
+       BufferedReader br = new BufferedReader(new FileReader(fileToRun));
+       int numberOfInstances = (int) br.lines().count();
+       int c = 0;
+       br = new BufferedReader(new FileReader(fileToRun));
+       String instance = br.readLine();
 
-        while (instance != null) {
-            c++;
+       Model m = utils.loadMatrix("graph-metadata/synth_mat_v2.txt");
 
-            String name = instance.substring(instance.indexOf("instances/") + 10);
+       while (instance != null) {
+           c++;
 
-            System.out.println(c + "/" + numberOfInstances + ": " + name);
+           String name = instance.substring(instance.indexOf("instances/") + 10);
 
-            long maxTime = 0;
-            int bestK = Integer.MAX_VALUE;
-            bw.write(name);
-            System.out.print("\t\t|");
-            for (int j = 0; j < iterations; j++) {
-                System.out.print("-");
-            }
-            System.out.print("|");
-            for (int i = 0; i < iterations; i++) {
-                long time = -System.nanoTime();
+           System.out.println(c + "/" + numberOfInstances + ": " + name);
 
-                // Put Heuristic here
-                int k = randomHeuristic(instance);
+           long maxTime = 0;
+           int bestK = Integer.MAX_VALUE;
+           bw.write(name);
+           System.out.print("\t\t|");
+           for (int j = 0; j < iterations; j++) {
+               System.out.print("-");
+           }
+           System.out.print("|");
+           for (int i = 0; i < iterations; i++) {
+               long time = -System.nanoTime();
 
-                time += System.nanoTime();
-                if (time > maxTime) {
-                    maxTime = time;
-                }
-                bw.write("," + k);
+               // Put Heuristic here
+               int k = randomHeuristic(instance);
 
-                // Progress Bar
-                for (int j = 0; j < iterations + 1; j++) {
-                    System.out.print("\b");
-                }
-                for (int j = 0; j <= i; j++) {
-                    System.out.print("█");
-                }
-                for (int j = i + 1; j < iterations; j++) {
-                    System.out.print("-");
-                }
-                System.out.print("|");
+               time += System.nanoTime();
+               if (time > maxTime) {
+                   maxTime = time;
+               }
+               bw.write("," + k);
 
-                if (k < bestK) {
-                    bestK = k;
-                }
-                //Progress Bar end
+               // Progress Bar
+               for (int j = 0; j < iterations + 1; j++) {
+                   System.out.print("\b");
+               }
+               for (int j = 0; j <= i; j++) {
+                   System.out.print("█");
+               }
+               for (int j = i + 1; j < iterations; j++) {
+                   System.out.print("-");
+               }
+               System.out.print("|");
 
-            }
-            double mTime = utils.round((double) maxTime / 1_000_000_000, 4);
-            bw.write("," + mTime + "\n");
-            bw.flush();
-            System.out.print("\t max time: " + mTime + "sec");
-            System.out.print("\tbestK: " + bestK);
-            if (solSizes.containsKey(name) && solSizes.get(name) != -1) {
-                System.out.print("\toptK:" + solSizes.get(name));
-            }
-            System.out.println("");
+               if (k < bestK) {
+                   bestK = k;
+               }
+               //Progress Bar end
+
+           }
+           double mTime = utils.round((double) maxTime / 1_000_000_000, 4);
+           bw.write("," + mTime + "\n");
+           bw.flush();
+           System.out.print("\t max time: " + mTime + "sec");
+           System.out.print("\tbestK: " + bestK);
+           if (solSizes.containsKey(name) && solSizes.get(name) != -1) {
+               System.out.print("\toptK:" + solSizes.get(name));
+           }
+           System.out.println("");
 
 
-            //createNodeData(iterations, solutions, bw, instance, name);
-            instance = br.readLine();
-        }
+           //createNodeData(iterations, solutions, bw, instance, name);
+           instance = br.readLine();
+       }
 
-        bw.close();
-    }
+       bw.close();
+   }
 
+*/
     private static void createNodeData(int iterations, Map<String, List<Integer>> solutions, BufferedWriter bw, String instance, String name) throws IOException {
         DirectedGraph g = new DirectedGraph(instance);
         g.k = Integer.MAX_VALUE;
@@ -450,8 +475,9 @@ public class Main {
         g.removeAllNodes(p.getSafeToDeleteDigraphNodes(true));
         if (!solutions.containsKey(name)) return;
         List<Integer> sol = new ArrayList<>(solutions.get(name));
+        System.out.print(" " + sol.size());
         for (int i = 0; i < iterations; i++) {
-            int b = new Random().nextInt( Math.max(1, sol.size() - 2));
+            int b = new Random().nextInt(Math.max(1, sol.size() - 2));
             Collections.shuffle(sol);
             for (int j = 0; j < b; j++) {
                 g.removeNode(sol.get(j));
@@ -460,7 +486,7 @@ public class Main {
             g.extractNodeMetaData(bw);
         }
     }
-
+    /*
     private static void runILP(String file, double timelimit) throws IOException, GRBException {
         BufferedReader br = new BufferedReader(new FileReader(file));
         String instance = br.readLine();
@@ -522,8 +548,9 @@ public class Main {
             //break;
         }
     }
+    */
 
-    private static List<Integer> ilp(String file, double timelimit) {
+    public static List<Integer> ilp(String file, double timelimit) {
 
         try {
             GRBModel model = new GRBModel(env, file);
@@ -568,6 +595,7 @@ public class Main {
         return null;
     }
 
+    /*
     private static int randomHeuristic(String file) {
         DirectedGraph g;
         if (file.contains("sheet5")) {
@@ -605,37 +633,6 @@ public class Main {
         return k.size();
     }
 
-    private static int NNHeuristic(String file, Model model) {
-        DirectedGraph g;
-        if (file.contains("sheet5")) {
-            g = new DirectedGraph(file, true);
-        } else {
-            g = new DirectedGraph(file);
-        }
-
-        Set<Integer> k = g.rootClean();
-
-        int batch = 30;
-        double limit = 0.8;
-
-        while (!g.nodeMap.isEmpty() && g.nodeMap.size() != g.predictions.size()) {
-            g.createPredictionsForBatch(batch, model);
-
-            k.addAll(g.deleteNodesByPredictions(limit));
-
-            if (g.predictions.size() == batch) {
-                batch += 10;
-                limit -= 0.05;
-            }
-        }
-        while (!g.nodeMap.isEmpty()) {
-            k.addAll(g.deleteNodesByPredictions(limit));
-            limit -= 0.05;
-        }
-
-        return k.size();
-    }
-
     private static void createGraphData(String fileFrom, String fileTo) {
         try {
             BufferedReader br = new BufferedReader(new FileReader(fileFrom));
@@ -668,4 +665,6 @@ public class Main {
         }
 
     }
+
+     */
 }

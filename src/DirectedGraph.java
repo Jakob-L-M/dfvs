@@ -12,12 +12,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     BiMap<String, Integer> dict = HashBiMap.create();
     int k;
     Stack<Integer> solution = new Stack<>();
-    Map<Double, Set<Integer>> invPredictions = new TreeMap<>();
     Map<Integer, Double> predictions = new HashMap<>();
-    Map<Integer, Double> invInPositions = new HashMap<>();
-    List<Double> inPositions = new ArrayList<>();
-    Map<Integer, Double> invOutPositions = new HashMap<>();
-    List<Double> outPositions = new ArrayList<>();
 
     DirectedGraph(String fileName) {
         try {
@@ -245,7 +240,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             }
 
         }
-        if (quick && changed) {
+        if (!quick && changed) {
             deletedNodes.addAll(rootClean(null, true));
         }
 
@@ -462,9 +457,6 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         }
         nodeMap.remove(nodeID);
 
-        if (predictions.containsKey(nodeID)) {
-            removePrediction(nodeID);
-        }
         return true;
     }
 
@@ -619,7 +611,6 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             Deque<Integer> queue = new ArrayDeque<>();
             Deque<Integer> tempCycle = new ArrayDeque<>();
             queue.add(start);
-            visited.clear();
             visited.add(start);
             while (!queue.isEmpty()) {
                 Integer currentNodeId = queue.pop();
@@ -689,50 +680,140 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return true;
     }
 
-    public int deathByPacking(int level, int levelLimit, Model m) {
+    public TimerTuple deathByPacking(int level, int levelLimit, Model m) {
         //int heurK = cleanGraph().size();
         //Set<Integer> delete = cleanGraph();
         //if (delete != null) heurK += delete.size();
+        Timer t = new Timer(6, new String[]{"packing", "predData", "predictions", "cleaning", "dfvsSolve", "tarjan"});
         this.k = Integer.MAX_VALUE;
-        int heurK = cleanGraph().size();
+        Set<Integer> heuristic = cleanGraph();
 
         Packing pack = new Packing(this);
+
+        long time = -System.nanoTime();
         List<Deque<Integer>> remove = pack.newFindCyclePacking(5, 2);
+        t.addTime("packing", time + System.nanoTime());
+
         while (!remove.isEmpty()) {
-            if (level > levelLimit) {
-                Tarjan tarjan = new Tarjan(this);
-                Set<DirectedGraph> sccs = tarjan.getSCCGraphs();
-                for (DirectedGraph scc : sccs) {
-                    if (scc.size() > 40) {
-                        heurK += scc.deathByPacking(level, levelLimit + 1, m);
-                    } else {
-                        heurK += Main.dfvsSolve(scc, true).size();
-                    }
-                }
-                return heurK;
-            }
             Set<Integer> changedNodes = new HashSet<>();
-            for (Deque<Integer> circle : remove) {
-                int nodeToDelete = circle.pop();
-                double prediction = m.predict(getNodeMetaData(nodeToDelete));
-                for (Integer v : circle) {
-                    double newPrediction = m.predict(getNodeMetaData(v));
-                    if (prediction < newPrediction) {
-                        nodeToDelete = v;
-                        prediction = newPrediction;
+            for (Deque<Integer> cyc : remove) {
+                int nodeToDelete = -1;
+                double prediction = -1.0;
+                for (Integer curNode : cyc) {
+
+                    double curPrediction;
+
+                    if (predictions.containsKey(curNode)) {
+                        if (Math.random() > 0.7) {
+
+                            time = -System.nanoTime();
+                            List<Double> metaData = getNodeMetaData(curNode);
+                            t.addTime("predData", time + System.nanoTime());
+
+                            time = -System.nanoTime();
+                            curPrediction = m.predict(metaData);
+                            t.addTime("predictions", time + System.nanoTime());
+
+                            predictions.put(curNode, curPrediction);
+                        } else {
+                            curPrediction = predictions.get(curNode);
+                        }
+                    } else {
+
+                        time = -System.nanoTime();
+                        List<Double> metaData = getNodeMetaData(curNode);
+                        t.addTime("predData", time + System.nanoTime());
+
+                        time = -System.nanoTime();
+                        curPrediction = m.predict(metaData);
+                        t.addTime("predictions", time + System.nanoTime());
+
+                        predictions.put(curNode, curPrediction);
+                    }
+
+                    if (curPrediction > prediction) {
+                        nodeToDelete = curNode;
+                        prediction = curPrediction;
                     }
                 }
-                if (prediction > 0.8 - 0.1*level) {
+                if (prediction > 0.8 - 0.1 * level) {
+                    removeNode(nodeToDelete);
+                    changedNodes.add(nodeToDelete);
+                } else if (false) {
+                    nodeToDelete = cyc.pop();
+                    for (Integer v : cyc) {
+                        if (nodeMap.get(v).getOutDegree() * nodeMap.get(v).getInDegree()
+                                > nodeMap.get(nodeToDelete).getOutDegree() * nodeMap.get(nodeToDelete).getInDegree()) {
+                            nodeToDelete = v;
+                        }
+                    }
                     removeNode(nodeToDelete);
                     changedNodes.add(nodeToDelete);
                 }
             }
-            heurK += changedNodes.size();
-            heurK += cleanGraph().size();
-            remove = pack.newFindCyclePacking(5, 3);
+
+            heuristic.addAll(changedNodes);
+
+            time = -System.nanoTime();
+            heuristic.addAll(cleanGraph());
+            t.addTime("cleaning", time + System.nanoTime());
+
+            time = -System.nanoTime();
+            remove = pack.newFindCyclePacking(4, 2);
+            t.addTime("packing", time + System.nanoTime());
+
+            if (remove.isEmpty()) {
+                return new TimerTuple(t, heuristic);
+            }
+            if (level > levelLimit) {
+                if (this.size() > 10000) {
+                    TimerTuple res = this.deathByPacking(level + 1, levelLimit + 2, m);
+                    heuristic.addAll(res.getSolution());
+                    t.addTimer(res.getTimer());
+                } else {
+
+                    time = -System.nanoTime();
+                    Tarjan tarjan = new Tarjan(this);
+                    Set<DirectedGraph> sccs = tarjan.getSCCGraphs();
+                    t.addTime("tarjan", time + System.nanoTime());
+
+                    for (DirectedGraph scc : sccs) {
+                        if (scc.size() > 40) {
+                            if (scc.size() > 1000) {
+                                TimerTuple res = scc.deathByPacking(level + 1, levelLimit + 4, m);
+                                heuristic.addAll(res.getSolution());
+                                t.addTimer(res.getTimer());
+                            } else if (scc.size() > 500) {
+                                TimerTuple res = scc.deathByPacking(level + 1, levelLimit + 3, m);
+                                heuristic.addAll(res.getSolution());
+                                t.addTimer(res.getTimer());
+                            } else {
+                                TimerTuple res = scc.deathByPacking(level + 1, levelLimit + 2, m);
+                                heuristic.addAll(res.getSolution());
+                                t.addTimer(res.getTimer());
+                            }
+                        } else {
+                            time = -System.nanoTime();
+                            String file = name.replace('/', '_');
+                            scc.createTopoLPFile(file + ".lp");
+                            List<Integer> sol = Main.ilp(file + ".lp", 20.0);
+                            t.addTime("dfvsSolve", time + System.nanoTime());
+                            if (sol == null) {
+                                TimerTuple res = scc.deathByPacking(level++, levelLimit + 2, m);
+                                heuristic.addAll(res.getSolution());
+                                t.addTimer(res.getTimer());
+                            } else {
+                                heuristic.addAll(sol);
+                            }
+                        }
+                    }
+                }
+                return new TimerTuple(t, heuristic);
+            }
+
             level++;
         }
-        return heurK;
+        return new TimerTuple(t, heuristic);
     }
 
     public void unfixAll() {
@@ -1098,114 +1179,9 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         res.add(noBiInDegree);
         res.add(noBiOutDegree);
 
-        res.add(utils.round((double) calculatePetal(nodeId, 3).getValue() / n, 8));
-
         return res;
     }
 
-    private void updatePositions() {
-        inPositions.clear();
-        outPositions.clear();
-        invInPositions.clear();
-        invOutPositions.clear();
-
-        int n = nodeMap.size();
-        for (DirectedNode node : nodeMap.values()) {
-            double inDeg = utils.round((double) node.getInDegree() / n, 5);
-            double outDeg = utils.round((double) node.getOutDegree() / n, 5);
-
-            inPositions.add(inDeg);
-            invInPositions.put(node.getNodeID(), inDeg);
-
-            outPositions.add(outDeg);
-            invOutPositions.put(node.getNodeID(), outDeg);
-        }
-    }
-
-    private double getRelativeInRank(int nodeId) {
-        int index = inPositions.indexOf(invInPositions.get(nodeId));
-        return utils.round((double) index / inPositions.size(), 6);
-    }
-
-    private double getRelativeOutRank(int nodeId) {
-        int index = outPositions.indexOf(invOutPositions.get(nodeId));
-        return utils.round((double) index / outPositions.size(), 6);
-    }
-
-    /**
-     * Will modify the graph's prediction map. After the prediction map is cleaned there will be batchSize - |mapSize|
-     * new Nodes added to the prediction map. Predictions are made using the given model. The methods will calculate
-     * each node's meta-data in order to make the prediction.
-     *
-     * @param batchSize Size to which the prediction map should be filled
-     * @param model     Neural Network that will calculate predictions based on meta-data
-     */
-    public void createPredictionsForBatch(int batchSize, Model model) {
-        // Cleaning predictions
-        for (Integer nodePd : new HashSet<>(predictions.keySet())) {
-            if (nodeMap.containsKey(nodePd)) {
-                continue;
-            }
-            removePrediction(nodePd);
-        }
-        // End cleaning predictions
-
-        Set<Integer> idsToCalculate;
-        if (predictions.size() + batchSize >= nodeMap.size()) {
-            idsToCalculate = new HashSet<>(nodeMap.keySet());
-        } else {
-            idsToCalculate = new HashSet<>();
-            List<Integer> ids = new ArrayList<>(nodeMap.keySet());
-            Collections.shuffle(ids);
-            for (int i = 0; i < ids.size() && idsToCalculate.size() < predictions.size() + batchSize; i++) {
-                int cur = ids.get(i);
-                if (!predictions.containsKey(cur)) {
-                    idsToCalculate.add(cur);
-                }
-            }
-        }
-
-        for (Integer nodeId : new HashSet<>(idsToCalculate)) {
-            if (!predictions.containsKey(nodeId)) {
-                double predict = model.predict(getNodeMetaData(nodeId));
-                if (invPredictions.containsKey(predict)) {
-                    invPredictions.get(predict).add(nodeId);
-                } else {
-                    Set<Integer> l = new HashSet<>();
-                    l.add(nodeId);
-                    invPredictions.put(predict, l);
-                }
-                predictions.put(nodeId, predict);
-            }
-        }
-    }
-
-    /**
-     * Uses the prediction map to delete all nodes greater or equal to a given limit. After all nodes are deleted the
-     * graph will be cleaned.
-     *
-     * @param limit A Node will be deleted if its prediction is greater or equal to this value
-     * @return All nodeIds that have been deleted due to predictions as well as cleaning
-     */
-    public Set<Integer> deleteNodesByPredictions(double limit) {
-        Set<Integer> nodesToDelete = new HashSet<>();
-        for (double key : invPredictions.keySet()) {
-            if (key >= limit) {
-                nodesToDelete.addAll(invPredictions.get(key));
-            }
-        }
-        for (Integer nodeId : nodesToDelete) {
-            removeNode(nodeId);
-        }
-        nodesToDelete.addAll(rootClean());
-        return nodesToDelete;
-    }
-
-    private void removePrediction(int nodeId) {
-        double predict = predictions.get(nodeId);
-        predictions.remove(nodeId);
-        invPredictions.get(predict).remove(nodeId);
-    }
 
     @Override
     public int compareTo(DirectedGraph o) {
