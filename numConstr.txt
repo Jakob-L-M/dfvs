@@ -1,0 +1,10 @@
+instances\complex\advotogo-n_100 4 4
+instances\complex\advotogo-n_1000 106 207
+instances\complex\advotogo-n_200 6 6
+instances\complex\advotogo-n_300 16 32
+instances\complex\advotogo-n_400 24 24
+instances\complex\advotogo-n_500 38 353
+instances\complex\advotogo-n_700 65 1025
+instances\complex3\advotogo-n_100 3 3
+ 0
+instances\synthetic3\synth-n_100-m_1093-k_5-p_0.2.txt 6 6
