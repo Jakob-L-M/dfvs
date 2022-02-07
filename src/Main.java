@@ -239,6 +239,7 @@ public class Main {
         Set<Integer> newDeletedNodes = packing.getSafeToDeleteDigraphNodes();
         graph.removeAllNodes(newDeletedNodes);
         Set<Integer> allDfvs = new HashSet<>(newDeletedNodes);
+        System.err.println("1");
         while (!newDeletedNodes.isEmpty()) {
             packing = new Packing(graph);
             packing.getDigraphs();
@@ -246,7 +247,7 @@ public class Main {
             graph.removeAllNodes(newDeletedNodes);
             allDfvs.addAll(newDeletedNodes);
         }
-
+        System.err.println("2");
         graph.k = Integer.MAX_VALUE;
         allDfvs.addAll(graph.cleanGraph());
         graph.k = 0;
@@ -256,18 +257,25 @@ public class Main {
         graph.clearStack();
         rootTime += System.nanoTime();
         for (DirectedGraph scc : SCCs) {
-
+            System.err.println("3");
             Packing sccPacking = new Packing(scc);
             int k = sccPacking.findCyclePacking().size();
             fullDigraphs = sccPacking.getDigraphs();
 
             Set<Integer> dfvs = null;
-
+            long timeInKdepth = -System.nanoTime();
+            long temp;
             while (dfvs == null && !interrupt) {
                 scc.addStackCheckpoint();
                 scc.k = k;
                 dfvs = dfvsBranch(scc);
                 k++;
+                temp = timeInKdepth + System.nanoTime();
+                timeInKdepth = -System.nanoTime();
+                if (temp >= 10_000_000_000L || k > 15) {
+                    return scc.deathByPacking(1, 3);
+                }
+                System.err.println("3 " + k);
                 scc.rebuildGraph();
                 scc.unfixAll();
             }

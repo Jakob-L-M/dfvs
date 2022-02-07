@@ -12,6 +12,8 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     BiMap<String, Integer> dict = HashBiMap.create();
     int k;
     Stack<Integer> solution = new Stack<>();
+    public PriorityQueue<DirectedNode> inDegreeQueue = new PriorityQueue<DirectedNode>(new nodeComparator());
+    public PriorityQueue<DirectedNode> outDegreeQueue = new PriorityQueue<DirectedNode>(new nodeComparatorInv());
 
     DirectedGraph(String fileName, boolean paceInst) {
         try {
@@ -72,11 +74,26 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return cleanGraph(true);
     }
 
-    public int deathByPacking(int levNum, int sccNum) {
-        int heurK = cleanSelfCyclesInit().size();
+
+    public void fillIndegreePriorityQueue() {
+        inDegreeQueue = new PriorityQueue<>(new nodeComparator());
+        for (DirectedNode node : nodeMap.values()) {
+            inDegreeQueue.add(node);
+        }
+    }
+
+    public void fillOutdegreePriorityQueue() {
+        outDegreeQueue = new PriorityQueue<>(new nodeComparatorInv());
+        for (DirectedNode node : nodeMap.values()) {
+            outDegreeQueue.add(node);
+        }
+    }
+
+    public Set<Integer> deathByPacking(int levNum, int sccNum) {
+        Set<Integer> heurK = rootClean();
         //Set<Integer> delete = cleanGraph();
         //if (delete != null) heurK += delete.size();
-        heurK += rootClean().size();
+
         Packing pack = new Packing(this);
         List<Deque<Integer>> remove = pack.newFindCyclePacking(6,3);
         int level = 0;
@@ -88,14 +105,22 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 for (DirectedGraph scc : sccs) {
                     graphMax = Math.max(graphMax, scc.size());
                 }
-                if (sccs.size() > sccNum && graphMax < 3_000) {
-                    for (DirectedGraph scc : sccs) {
-                        heurK += Main.dfvsSolve(scc).size();
+                for (DirectedGraph scc : sccs) {
+                    if (scc.size() > 100) {
+                        //System.err.println("sccNum: " + sccs.size());
+                        //System.err.println(scc.size());
+                        //System.out.println(scc);
+                        heurK.addAll(scc.deathByPacking(levNum, sccNum));
                     }
-                    return heurK;
+                    else {
+                        //System.err.println(scc.size() + " exact");
+                        heurK.addAll(scc.rootClean());
+                        //System.out.println(scc.cleanSelfCyclesInit());
+                        heurK.addAll(Main.dfvsSolve(scc));
+                    }
                 }
+                return heurK;
             }
-            int count = 0;
             Set<Integer> changedNodes = new HashSet<>();
             for (Deque<Integer> circle : remove) {
                 int nodeToDelete = circle.pop();
@@ -107,11 +132,10 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 }
                 removeNode(nodeToDelete);
                 changedNodes.add(nodeToDelete);
-                count++;
             }
-            heurK += count;
-            System.out.println("added " + count);
-            heurK += rootClean().size();
+            heurK.addAll(changedNodes);
+            //System.out.println("added " + changedNodes.size());
+            heurK.addAll(rootClean());
             remove = pack.newFindCyclePacking(6, 3);
             level++;
         }
@@ -536,6 +560,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         }
         for (Integer postNode : node.getOutNodes()) {
             nodeMap.get(postNode).removeInNode(nodeID);
+
         }
         nodeMap.remove(nodeID);
         return true;
@@ -673,6 +698,20 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             // if the node is a selfCycle we will remove it and reduce k
             if (node.isSinkSource()) {
                 removeSinkSource(nodeId);
+            }
+        }
+    }
+
+    public DirectedGraph(DirectedGraph that, boolean dfas) {
+        this();
+        for (Integer nodeId : that.nodeMap.keySet()) {
+            addNode(nodeId + 1);
+            addNode(-nodeId -1);
+            addEdge(-nodeId - 1, nodeId + 1);
+        }
+        for (DirectedNode u : that.nodeMap.values()) {
+            for (Integer v : u.getOutNodes()) {
+                addEdge(u.getNodeID() + 1, -v - 1);
             }
         }
     }
@@ -923,7 +962,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     }
 
     public int size() {
-        return nodeMap.size();
+        return nodeMap.keySet().size();
     }
 
     public String hash() {
@@ -1091,6 +1130,40 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
     public long createTopoLPFile(List<Set<Integer>> digraphs) {
         return createTopoLPFile("ILPs/" + name + ".lp", digraphs);
+    }
+
+    static class nodeComparatorInv implements Comparator<DirectedNode> {
+        @Override
+        public int compare(DirectedNode node1, DirectedNode node2) {
+            if (node1.getNodeID() < 0) return 1;
+            else if (node1.getNodeID() > 0 && node2.getNodeID() < 0) return -1;
+            if (node1.getOutDegree() < node2.getOutDegree()) {
+                return -1;
+            }
+            else if (node1.getOutDegree() == node2.getOutDegree()) {
+                return 0;
+            }
+            else {
+                return 1;
+            }
+        }
+    }
+
+    static class nodeComparator implements Comparator<DirectedNode> {
+        @Override
+        public int compare(DirectedNode node1, DirectedNode node2) {
+            if (node1.getNodeID() > 0) return 1;
+            else if (node1.getNodeID() < 0 && node2.getNodeID() > 0) return -1;
+            if (node1.getInDegree() < node2.getInDegree()) {
+                return -1;
+            }
+            else if (node1.getInDegree() == node2.getInDegree()) {
+                return 0;
+            }
+            else {
+                return 1;
+            }
+        }
     }
 
 

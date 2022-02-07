@@ -22,17 +22,10 @@ public class Packing {
     }
 
     public static void main(String[] args) {
-        //DirectedGraph g = new DirectedGraph("instances/h_001", true);
-        //System.out.println(g.size());
-        //System.out.println(Main.dfvsSolve(g));
-
-        //for (int runs =  0; runs < 10; runs++) {
-          //  for (int level = 0; level < 5; level++) {
-            //    for (int sccs = 1; sccs < 13; sccs+=2) {
-              //      runParam(args[0], runs, level, sccs);
+        runInst(args[0]);
 
 
-        if (true) {
+        if (false) {
             Set<String> jakobInst = new HashSet<>();
             String[] jakobNames = new String[] {"h_119"};//"e_159","e_169","h_177","h_133","h_157","h_171","h_179","h_187","h_189"};
             for (String inst : jakobNames) {
@@ -40,10 +33,11 @@ public class Packing {
             }
             try {
             BufferedWriter writer = new BufferedWriter(new FileWriter("packingTimes.txt", true));
-            writer.write("name heurK\n");
+            writer.write("name heurK time\n");
             File instances = new File("instances");
+            long time = -System.nanoTime();
             for (File subInst : instances.listFiles()) {
-                if (!subInst.getName().contains("sheet5") || !subInst.isDirectory()) continue;
+                if (subInst.getName().contains("sheet5") || !subInst.isDirectory()) continue;
                 int count = 0;
                 for (File instance : subInst.listFiles()) {
                     //if (!jakobInst.contains(instance.getName())) continue;
@@ -60,7 +54,7 @@ public class Packing {
                         //safeNodes.addAll(packing.getSafeToDeleteDigraphNodes());
                         //graph.removeAllNodes(safeNodes);
                         //safeNodes.addAll(graph.rootClean(safeNodes));
-                        int sol = graph.deathByPacking(30, 4) + safeNodes.size();
+                        int sol = graph.deathByPacking(3, 0).size() + safeNodes.size();
                         all_heurs[i] = sol;
                         if (sol < best_heur) best_heur = sol;
                     }
@@ -74,12 +68,14 @@ public class Packing {
                     System.out.println("count: " + count++);
                 }
             }
+            time += System.nanoTime();
+            writer.write("totalTime: " + time);
             writer.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
         }
-        else {
+        else if (false) {
             try {
                 long time = - System.nanoTime();
                 BufferedWriter writer = new BufferedWriter(new FileWriter("packingTimesSinglePacking.txt", true));
@@ -88,7 +84,7 @@ public class Packing {
                 int[] all_heurs = new int[runs];
                 for (int i = 0; i < runs; i++) {
                     DirectedGraph graph = new DirectedGraph(args[0]);
-                    int sol = graph.deathByPacking(1,1);
+                    int sol = graph.deathByPacking(1,1).size();
                     all_heurs[i] = sol;
                     if (sol < best_heur) best_heur = sol;
                 }
@@ -102,6 +98,44 @@ public class Packing {
 
     }
 
+    public static void runInst(String filename) {
+        try {
+            BufferedWriter writer = new BufferedWriter(new FileWriter("packingTimes.txt", true));
+            int best_heur = Integer.MAX_VALUE;
+            int runs = 1;
+            int[] all_heurs = new int[runs];
+            Set<Integer> sol = new HashSet<>();
+            Set<Integer> opt_sol = new HashSet<>();
+            //long totalTime = -System.nanoTime();
+            //long singleTime = -System.nanoTime();
+            //long temp;
+            for (int i = 0; i < runs; i++) {
+                DirectedGraph graph = new DirectedGraph(filename);
+                sol = graph.rootClean();
+                sol.addAll(graph.deathByPacking(1000, 0));
+                //all_heurs[i] = sol.size();
+                if (sol.size() < best_heur) {
+                    best_heur = sol.size();
+                    opt_sol = new HashSet<>();
+                    opt_sol.addAll(sol);
+                }
+                //temp = (totalTime + System.nanoTime())/(i+1);
+                //boolean enoughTime = (600_000_000_000L - totalTime - System.nanoTime()- 10_000_000_000L) > temp;
+                //if (enoughTime) runs++;
+            }
+            //singleTime += System.nanoTime();
+            //writer.write(filename + " " + best_heur + " " + singleTime + "\n");
+            writer.close();
+            for (Integer i : sol) {
+                System.out.println(i);
+            }
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
     public static void runParam(String filename, int runs, int level, int sccs) {
         try {
             long time = - System.nanoTime();
@@ -110,7 +144,7 @@ public class Packing {
             int[] all_heurs = new int[runs];
             for (int i = 0; i < runs; i++) {
                 DirectedGraph graph = new DirectedGraph(filename);
-                int sol = graph.deathByPacking(level, sccs);
+                int sol = graph.deathByPacking(level, sccs).size();
                 all_heurs[i] = sol;
                 if (sol < best_heur) best_heur = sol;
             }
