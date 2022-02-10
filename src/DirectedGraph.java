@@ -14,6 +14,8 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     Stack<Integer> solution = new Stack<>();
     public PriorityQueue<DirectedNode> inDegreeQueue = new PriorityQueue<DirectedNode>(new nodeComparator());
     public PriorityQueue<DirectedNode> outDegreeQueue = new PriorityQueue<DirectedNode>(new nodeComparatorInv());
+    public ArrayList<Integer> topologicalOrder = new ArrayList<>();
+    public ArrayList<Integer> topologicalOrderRight = new ArrayList<>();
 
     DirectedGraph(String fileName, boolean paceInst) {
         try {
@@ -706,12 +708,15 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         this();
         for (Integer nodeId : that.nodeMap.keySet()) {
             addNode(nodeId + 1);
-            addNode(-nodeId -1);
+            addNode(-nodeId - 1);
             addEdge(-nodeId - 1, nodeId + 1);
         }
         for (DirectedNode u : that.nodeMap.values()) {
             for (Integer v : u.getOutNodes()) {
                 addEdge(u.getNodeID() + 1, -v - 1);
+            }
+            for (Integer v : u.getInNodes()) {
+                addEdge(v + 1, -u.getNodeID() - 1);
             }
         }
     }
@@ -1141,6 +1146,12 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 return -1;
             }
             else if (node1.getOutDegree() == node2.getOutDegree()) {
+                if (node1.getInNodes().contains(node2.getNodeID())) {
+                    return -1;
+                }
+                else if (node2.getInNodes().contains(node1.getNodeID())) {
+                    return 1;
+                }
                 return 0;
             }
             else {
@@ -1158,6 +1169,12 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 return -1;
             }
             else if (node1.getInDegree() == node2.getInDegree()) {
+                if (node1.getOutNodes().contains(node2.getNodeID())) {
+                    return -1;
+                }
+                else if (node2.getOutNodes().contains(node1.getNodeID())) {
+                    return 1;
+                }
                 return 0;
             }
             else {
@@ -1165,6 +1182,18 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             }
         }
     }
+/*
+    public void fuseDfasNodes() {
+        DirectedNode leftNode;
+        if (!inDegreeQueue.isEmpty()) leftNode = inDegreeQueue.poll();
+        while (!inDegreeQueue.isEmpty()) {
+            DirectedNode rightNode = inDegreeQueue.poll();
+            Set<Integer> left
+            if (left)
+        }
+    }
+*/
+
 
 
     @Override

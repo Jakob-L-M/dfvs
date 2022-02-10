@@ -11,6 +11,7 @@ public class DFAS {
 
 
     public static void main(String[] args) throws IOException {
+        int count = 0;
         File allInst = new File("instances");
         BufferedWriter writer = new BufferedWriter(new FileWriter("dfas_heur.txt", true));
         for (File instFolder : allInst.listFiles()) {
@@ -20,8 +21,8 @@ public class DFAS {
                 Set<Integer> solution = runInst(instance.getPath());
                 time += System.nanoTime();
                 String timeString = Long.toString((int) time/60_000_000_000L) + ":" + Long.toString((int)((time/1_000_000_000L)%60)) +"."+Long.toString((time/10_000_000L)%6000);
-                System.out.println(instance.getName() + " " + timeString + " " + solution.size());
-                writer.write(instance.getPath() + " " + solution.size() + " " + timeString + "\n");
+                //System.out.println(count++ + ": " + instance.getName() + " " + timeString + " " + solution.size());
+                writer.write("../" + instance.getPath().replace('\\', '/') + " " + solution.size() + " " + timeString + "\n");
             }
         }
         writer.close();
@@ -34,82 +35,91 @@ public class DFAS {
         //in die Lösungsmenge aufgenommen. Das Cleaning liefert unter Umständen gleichnamige
         //Integer. Daher hier negativ in die Lösung aufgenommen.
         for (Integer u : dfvsGraph.rootClean()) {
-            solution.add(-u);
+            solution.add(-u -1_000_000);
         }
         DirectedGraph dfasGraph = new DirectedGraph(dfvsGraph, true);
         //Solange der Graph nicht gelöscht ist, werden weiter Knoten in die topologische
         //Sortierung aufgenommen und potentiell gelöscht.
-        while (!dfasGraph.nodeMap.keySet().isEmpty()) {
-            boolean change = true;
-            dfasGraph.fillIndegreePriorityQueue();
-            dfasGraph.fillOutdegreePriorityQueue();
-            // Sinks und Sources werden kostenlos in die topologische Sortierung aufgenommen
-            while (change) {
-                change = false;
-                Set<Integer> addToTopo = new HashSet<>();
-                //Knoten mit Indegree 0 aus der Queue werden aufgenommen
-                if (!dfasGraph.inDegreeQueue.isEmpty()) {
-                    while (dfasGraph.inDegreeQueue.peek().getInDegree() == 0) {
-                        addToTopo.add(dfasGraph.inDegreeQueue.poll().getNodeID());
-                    }
-                }
-                //Knoten mit Outdegree 0 aus der Queue werden aufgenommen
-                if (!dfasGraph.outDegreeQueue.isEmpty()) {
-                    while (dfasGraph.outDegreeQueue.peek().getOutDegree() == 0) {
-                        addToTopo.add(dfasGraph.outDegreeQueue.poll().getNodeID());
-                    }
-                }
-                //v+ und v- werden gelöscht, wenn einer von beiden Sink/Source ist
-                for (Integer nodeId : addToTopo) {
-                    dfasGraph.removeNode(nodeId);
-                    dfasGraph.removeNode(-nodeId);
+        Set<Integer> addToTopoLeft = new HashSet<>();
+        Set<Integer> addToTopoRight = new HashSet<>();
+        Set<Integer> notInTopo = new HashSet<>(dfasGraph.nodeMap.keySet());
+        int n = dfasGraph.size();
+        boolean change = true;
+        dfasGraph.fillIndegreePriorityQueue();
+        dfasGraph.fillOutdegreePriorityQueue();
+        // Sinks und Sources werden kostenlos in die topologische Sortierung aufgenommen
+
+        while (change) {
+            change = false;
+            //Knoten mit Indegree 0 aus der Queue werden aufgenommen
+            if (!dfasGraph.inDegreeQueue.isEmpty()) {
+                while (dfasGraph.inDegreeQueue.peek().getInDegree() == 0) {
+                    Integer nodeID = dfasGraph.inDegreeQueue.poll().getNodeID();
+                    addToTopoLeft.add(nodeID);
+                    addToTopoRight.add(nodeID);
+                    dfasGraph.removeEdge(-Math.abs(nodeID),Math.abs(nodeID));
+                    notInTopo.remove(nodeID);
+                    notInTopo.remove(Math.abs(nodeID));
                     change = true;
                 }
-                //aktualisiert die beiden PriorityQueues, evtl. Verbesserungsbedarf (nur bzgl. Laufzeit),
-                //da diese komplett neu aufgesetzt werden
-                dfasGraph.fillIndegreePriorityQueue();
-                dfasGraph.fillOutdegreePriorityQueue();
             }
-            Integer vMinus = 0;
-            int maxHeur = 0;
-            int minDegree = Integer.MAX_VALUE;
-            if (!dfasGraph.inDegreeQueue.isEmpty()) {
-                minDegree = dfasGraph.inDegreeQueue.peek().getInDegree();
-                vMinus = dfasGraph.inDegreeQueue.peek().getNodeID();
-                maxHeur = dfasGraph.getNode(-vMinus).getOutDegree();
-                for (DirectedNode node : dfasGraph.inDegreeQueue) {
-                    if (node.getInDegree() <= minDegree) {
-                        if (dfasGraph.getNode(-node.getNodeID()).getOutDegree() > maxHeur) {
-                            maxHeur = dfasGraph.getNode(-node.getNodeID()).getOutDegree();
-                            vMinus = node.getNodeID();
-                        }
-                    }
-                    else {
-                        break;
-                    }
-                }
-            }
+            //Knoten mit Outdegree 0 aus der Queue werden aufgenommen
             if (!dfasGraph.outDegreeQueue.isEmpty()) {
-                minDegree = Math.min(minDegree, dfasGraph.outDegreeQueue.peek().getOutDegree());
-                vMinus = -dfasGraph.outDegreeQueue.peek().getNodeID();
-                maxHeur = dfasGraph.getNode(-vMinus).getInDegree();
-                for (DirectedNode node : dfasGraph.outDegreeQueue) {
-                    if (node.getInDegree() <= minDegree) {
-                        if (dfasGraph.getNode(-node.getNodeID()).getInDegree() > maxHeur) {
-                            maxHeur = dfasGraph.getNode(-node.getNodeID()).getInDegree();
-                            vMinus = node.getNodeID();
-                        }
-                    }
-                    else {
-                        break;
-                    }
+                while (dfasGraph.outDegreeQueue.peek().getOutDegree() == 0) {
+                    Integer nodeID = dfasGraph.outDegreeQueue.poll().getNodeID();
+                    addToTopoRight.add(nodeID);
+                    addToTopoLeft.add(-nodeID);
+                    dfasGraph.removeEdge(-Math.abs(nodeID),Math.abs(nodeID));
+                    notInTopo.remove(nodeID);
+                    notInTopo.remove(-Math.abs(nodeID));
+                    change = true;
                 }
             }
-            //System.out.println("deleting edge: (" + vMinus + ", " + -vMinus + ")");
-            if (vMinus != 0) solution.add(Math.abs(vMinus));
-            dfasGraph.removeNode(vMinus);
-            dfasGraph.removeNode(-vMinus);
+            //aktualisiert die beiden PriorityQueues, evtl. Verbesserungsbedarf (nur bzgl. Laufzeit),
+            //da diese komplett neu aufgesetzt werden
+            //dfasGraph.fillIndegreePriorityQueue();
+            //dfasGraph.fillOutdegreePriorityQueue();
         }
+
+        if (dfasGraph.size() > 0) addToTopoLeft.add(dfasGraph.nodeMap.keySet().stream().iterator().next());
+        while (!notInTopo.isEmpty()) {
+            Integer vPlus = 0;
+            Integer backEdgeMax = -1;
+            Integer vFree = 0;
+            for (Integer notTopoNode : notInTopo) {
+                Set<Integer> backConnections = dfasGraph.getNode(notTopoNode).getOutNodes();
+                backConnections.retainAll(addToTopoLeft);
+                if (backConnections.size() > backEdgeMax) {
+                    backEdgeMax = backConnections.size();
+                    vPlus = notTopoNode;
+                }
+                if (backConnections.size() == 0 && notTopoNode > 0) {
+                    vFree = notTopoNode;
+                }
+            }
+            if (vFree != 0) {
+                vFree = Math.abs(vFree);
+                addToTopoLeft.add(vFree);
+                addToTopoLeft.add(-vFree);
+                notInTopo.remove(vFree);
+                notInTopo.remove(-vFree);
+            }
+            else {
+                vPlus = Math.abs(vPlus);
+                addToTopoLeft.add(vPlus);
+                addToTopoRight.add(-vPlus);
+                notInTopo.remove(vPlus);
+                notInTopo.remove(-vPlus);
+                solution.add(vPlus);
+                dfasGraph.removeEdge(-vPlus, vPlus);
+            }
+
+
+            System.out.println((n- notInTopo.size()) + "/" + notInTopo.size() + "  vFree: " + vFree);
+        }
+        System.out.println(solution);
         return solution;
     }
+
+
 }
