@@ -11,6 +11,7 @@ public class DFAS {
 
 
     public static void main(String[] args) throws IOException {
+        DirectedGraph
         int count = 0;
         File allInst = new File("instances");
         BufferedWriter writer = new BufferedWriter(new FileWriter("dfas_heur.txt", true));
