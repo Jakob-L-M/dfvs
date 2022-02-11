@@ -72,6 +72,23 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         name = "temp";
     }
 
+    public DirectedGraph(DirectedGraph that, boolean dfas) {
+        name = "dfas";
+        for (Integer nodeId : that.nodeMap.keySet()) {
+            this.addNode(nodeId + 1);
+            this.addNode(-nodeId - 1);
+            this.addEdge(-nodeId - 1, nodeId + 1);
+        }
+        for (DirectedNode u : that.nodeMap.values()) {
+            for (Integer v : u.getOutNodes()) {
+                this.addEdge(u.getNodeID() + 1, -v - 1);
+            }
+            for (Integer v : u.getInNodes()) {
+                this.addEdge(v + 1, -u.getNodeID() - 1);
+            }
+        }
+    }
+
     public Set<Integer> cleanGraph() {
         return cleanGraph(true);
     }
@@ -79,16 +96,12 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
     public void fillIndegreePriorityQueue() {
         inDegreeQueue = new PriorityQueue<>(new nodeComparator());
-        for (DirectedNode node : nodeMap.values()) {
-            inDegreeQueue.add(node);
-        }
+        inDegreeQueue.addAll(nodeMap.values());
     }
 
     public void fillOutdegreePriorityQueue() {
         outDegreeQueue = new PriorityQueue<>(new nodeComparatorInv());
-        for (DirectedNode node : nodeMap.values()) {
-            outDegreeQueue.add(node);
-        }
+        outDegreeQueue.addAll(nodeMap.values());
     }
 
     public Set<Integer> deathByPacking(int levNum, int sccNum) {
@@ -700,23 +713,6 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             // if the node is a selfCycle we will remove it and reduce k
             if (node.isSinkSource()) {
                 removeSinkSource(nodeId);
-            }
-        }
-    }
-
-    public DirectedGraph(DirectedGraph that, boolean dfas) {
-        this();
-        for (Integer nodeId : that.nodeMap.keySet()) {
-            addNode(nodeId + 1);
-            addNode(-nodeId - 1);
-            addEdge(-nodeId - 1, nodeId + 1);
-        }
-        for (DirectedNode u : that.nodeMap.values()) {
-            for (Integer v : u.getOutNodes()) {
-                addEdge(u.getNodeID() + 1, -v - 1);
-            }
-            for (Integer v : u.getInNodes()) {
-                addEdge(v + 1, -u.getNodeID() - 1);
             }
         }
     }
