@@ -29,7 +29,7 @@ public class Packing {
             double diGraphTime = utils.round((double) (time+System.nanoTime())/1_000_000_000, 5);
             //System.out.print("\t" + diGraphTime);
             time = -System.nanoTime();
-            int newPacking = p.newFindCyclePacking(4,2).size();
+            int newPacking = p.newFindCyclePacking(4,2, 5_000).size();
             double newTime = utils.round((double) (time+System.nanoTime())/1_000_000_000, 5);
             System.out.println("\t" + newPacking + "\t" + newTime);
         }
@@ -97,7 +97,7 @@ public class Packing {
     }
 
     public List<Deque<Integer>> newFindCyclePacking() {
-        return newFindCyclePacking(Integer.MAX_VALUE - 100, Integer.MAX_VALUE - 100);
+        return newFindCyclePacking(Integer.MAX_VALUE - 100, Integer.MAX_VALUE - 100, Integer.MAX_VALUE - 100);
     }
 
     public List<Deque<Integer>> findCyclePacking() {
@@ -115,11 +115,13 @@ public class Packing {
         return costlySubGraphs;
     }
 
-    public List<Deque<Integer>> newFindCyclePacking(int limit, int sameCycleCount) {
+    public List<Deque<Integer>> newFindCyclePacking(int limit, int sameCycleCount, int packingLimit) {
         graph.addStackCheckpoint();
+        int kBefore = graph.k;
+        graph.k = Integer.MAX_VALUE;
         List<Deque<Integer>> packing = new ArrayList<>();
         Deque<Integer> cycle = graph.findBestCycle(sameCycleCount, limit);
-        while (cycle != null) {
+        while (cycle != null && packing.size() < packingLimit) {
             packing.add(cycle);
             for (Integer i : cycle) {
                 DirectedNode node = graph.nodeMap.get(i);
@@ -133,10 +135,12 @@ public class Packing {
             cycle = graph.findBestCycle(limit, sameCycleCount);
         }
         graph.rebuildGraph();
+        graph.k = kBefore;
         return packing;
     }
 
     public List<Set<Integer>> getDigraphs() {
+        if (this.digraphs != null) return digraphs;
         graph.addStackCheckpoint();
         List<Set<Integer>> digraphs = new ArrayList<>();
         Set<Integer> nodes = graph.nodeMap.keySet();

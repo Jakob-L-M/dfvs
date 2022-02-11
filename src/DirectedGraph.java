@@ -3,6 +3,7 @@ import com.google.common.collect.HashBiMap;
 
 import java.io.*;
 import java.util.*;
+import java.util.stream.IntStream;
 
 
 public class DirectedGraph implements Comparable<DirectedGraph> {
@@ -614,6 +615,12 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             visited.add(start);
             while (!queue.isEmpty()) {
                 Integer currentNodeId = queue.pop();
+
+                // Stop searching if we surpassed the best known cycle
+                if ((!currentNodeId.equals(start)) && !(cycleLength == 0 || limitParentDepth(currentNodeId, start, parent, cycleLength + 1))) {
+                    continue;
+                }
+
                 for (Integer outNodeId : nodeMap.get(currentNodeId).getOutNodes()) {
                     if (!visited.contains(outNodeId)) {
                         parent.put(outNodeId, currentNodeId);
@@ -680,7 +687,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return true;
     }
 
-    public TimerTuple deathByPacking(int level, int levelLimit, Model m) {
+    public TimerTuple deathByPacking(int level, int levelLimit, Model m, double percentageReduction) {
         //int heurK = cleanGraph().size();
         //Set<Integer> delete = cleanGraph();
         //if (delete != null) heurK += delete.size();
@@ -691,14 +698,20 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         Packing pack = new Packing(this);
 
         long time = -System.nanoTime();
-        List<Deque<Integer>> remove = pack.newFindCyclePacking(5, 2);
+        List<Deque<Integer>> cyclePacking = pack.newFindCyclePacking(4, 2, 5_000);
         t.addTime("packing", time + System.nanoTime());
 
-        while (!remove.isEmpty()) {
+        while (!cyclePacking.isEmpty()) {
             Set<Integer> changedNodes = new HashSet<>();
-            for (Deque<Integer> cyc : remove) {
+            List<Deque<Integer>> nonRemovedCycles = new ArrayList<>();
+            for (Deque<Integer> cyc : cyclePacking) {
                 int nodeToDelete = -1;
                 double prediction = -1.0;
+
+                if (!containsNodes(cyc)) {
+                    continue;
+                }
+
                 for (Integer curNode : cyc) {
 
                     double curPrediction;
@@ -736,19 +749,18 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                         prediction = curPrediction;
                     }
                 }
-                if (prediction > 0.8 - 0.1 * level) {
+                if (prediction > 0.8 - percentageReduction) {
                     removeNode(nodeToDelete);
                     changedNodes.add(nodeToDelete);
-                } else if (false) {
-                    nodeToDelete = cyc.pop();
-                    for (Integer v : cyc) {
-                        if (nodeMap.get(v).getOutDegree() * nodeMap.get(v).getInDegree()
-                                > nodeMap.get(nodeToDelete).getOutDegree() * nodeMap.get(nodeToDelete).getInDegree()) {
-                            nodeToDelete = v;
-                        }
-                    }
-                    removeNode(nodeToDelete);
-                    changedNodes.add(nodeToDelete);
+                } else {
+                    nonRemovedCycles.add(cyc);
+                }
+            }
+
+            List<Deque<Integer>> cyclesToKeep = new ArrayList<>();
+            for (Deque<Integer> d : nonRemovedCycles) {
+                if (Math.random() < 4*Math.exp(-0.3*d.size())) {
+                    cyclesToKeep.add(d);
                 }
             }
 
@@ -758,16 +770,17 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             heuristic.addAll(cleanGraph());
             t.addTime("cleaning", time + System.nanoTime());
 
-            time = -System.nanoTime();
-            remove = pack.newFindCyclePacking(4, 2);
-            t.addTime("packing", time + System.nanoTime());
 
-            if (remove.isEmpty()) {
+            percentageReduction += 0.3*(double) (nonRemovedCycles.size())/cyclePacking.size();
+
+
+            if (nodeMap.isEmpty()) {
                 return new TimerTuple(t, heuristic);
             }
-            if (level > levelLimit) {
-                if (this.size() > 10000) {
-                    TimerTuple res = this.deathByPacking(level + 1, levelLimit + 2, m);
+
+            if (level >= levelLimit) {
+                if (this.size() > 5_000) {
+                    TimerTuple res = this.deathByPacking(level + 1, levelLimit + 2, m, percentageReduction);
                     heuristic.addAll(res.getSolution());
                     t.addTimer(res.getTimer());
                 } else {
@@ -778,17 +791,13 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                     t.addTime("tarjan", time + System.nanoTime());
 
                     for (DirectedGraph scc : sccs) {
-                        if (scc.size() > 40) {
+                        if (scc.size() > 100) {
                             if (scc.size() > 1000) {
-                                TimerTuple res = scc.deathByPacking(level + 1, levelLimit + 4, m);
-                                heuristic.addAll(res.getSolution());
-                                t.addTimer(res.getTimer());
-                            } else if (scc.size() > 500) {
-                                TimerTuple res = scc.deathByPacking(level + 1, levelLimit + 3, m);
+                                TimerTuple res = scc.deathByPacking(level + 1, levelLimit + 2, m, percentageReduction);
                                 heuristic.addAll(res.getSolution());
                                 t.addTimer(res.getTimer());
                             } else {
-                                TimerTuple res = scc.deathByPacking(level + 1, levelLimit + 2, m);
+                                TimerTuple res = scc.deathByPacking(level + 1, levelLimit + 1, m, percentageReduction);
                                 heuristic.addAll(res.getSolution());
                                 t.addTimer(res.getTimer());
                             }
@@ -799,7 +808,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                             List<Integer> sol = Main.ilp(file + ".lp", 20.0);
                             t.addTime("dfvsSolve", time + System.nanoTime());
                             if (sol == null) {
-                                TimerTuple res = scc.deathByPacking(level++, levelLimit + 2, m);
+                                TimerTuple res = scc.deathByPacking(level++, levelLimit + 2, m,percentageReduction);
                                 heuristic.addAll(res.getSolution());
                                 t.addTimer(res.getTimer());
                             } else {
@@ -811,9 +820,43 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 return new TimerTuple(t, heuristic);
             }
 
+            this.addStackCheckpoint();
+
+            System.out.println("Total: " + cyclePacking.size() + " Removed: " +
+                    (cyclePacking.size()- nonRemovedCycles.size()) + " Keeping: " + cyclesToKeep.size());
+
+            for (Deque<Integer> cycle : cyclesToKeep) {
+                for (Integer node : cycle) {
+                    this.removeNode(node);
+                }
+            }
+
+            cleanGraph();
+
+            time = -System.nanoTime();
+            cyclePacking = pack.newFindCyclePacking(5, 2, 1_500);
+
+            this.rebuildGraph();
+
+            cyclePacking.addAll(cyclesToKeep);
+            t.addTime("packing", time + System.nanoTime());
+
+            if (cyclePacking.isEmpty()) {
+                return new TimerTuple(t, heuristic);
+            }
+
             level++;
         }
         return new TimerTuple(t, heuristic);
+    }
+
+    public boolean containsNodes(Deque<Integer> nodes) {
+        for (Integer i : nodes) {
+            if (!nodeMap.containsKey(i)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public void unfixAll() {
@@ -1032,9 +1075,13 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         List<Integer> inOutDegrees = new ArrayList<>();
         List<Integer> outInDegrees = new ArrayList<>();
         List<Integer> outOutDegrees = new ArrayList<>();
+        List<Integer> inTimesOut = new ArrayList<>();
+        List<Integer> biDirectional = new ArrayList<>();
+        List<Integer> nonBiDirectional = new ArrayList<>();
+
         for (Integer nodeId : new HashSet<>(nodeMap.keySet())) {
 
-            if (nodeId % n / 45 != 0) {
+            if (nodeId % n / 50 != 0) {
                 continue;
             }
 
@@ -1043,6 +1090,8 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
             inDegrees.add(node.getInDegree());
             outDegrees.add(node.getOutDegree());
+            inTimesOut.add(node.getInDegree()*node.getOutDegree());
+
             int inInNodes = 0;
             int inOutNodes = 0;
             int outOutNodes = 0;
@@ -1061,32 +1110,44 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             inOutDegrees.add(inOutNodes);
             outInDegrees.add(outInNodes);
             outOutDegrees.add(outOutNodes);
+            biDirectional.add(node.biDirectionalCount());
+            nonBiDirectional.add(Math.min(node.getInDegree(), node.getOutDegree()) - node.biDirectionalCount());
         }
 
         Collections.sort(inDegrees);
         Collections.sort(outDegrees);
+        Collections.sort(inTimesOut);
         Collections.sort(inInDegrees);
         Collections.sort(inOutDegrees);
         Collections.sort(outInDegrees);
         Collections.sort(outOutDegrees);
+        Collections.sort(biDirectional);
+        Collections.sort(nonBiDirectional);
+
 
         result.add((double) m / n);
 
-        int nth = inDegrees.size() / 10;
-        for (int i = 0; i <= 9; i++) {
-            result.add((double) inDegrees.get(i * nth) / n);
-            result.add((double) outDegrees.get(i * nth) / n);
-            result.add((double) inInDegrees.get(i * nth) / n);
-            result.add((double) inOutDegrees.get(i * nth) / n);
-            result.add((double) outInDegrees.get(i * nth) / n);
-            result.add((double) outOutDegrees.get(i * nth) / n);
+        for (int i : List.of(0, inDegrees.size()/2, inDegrees.size()-1)) {
+            result.add((double) inDegrees.get(i) / n);
+            result.add((double) outDegrees.get(i) / n);
+            result.add((double) inTimesOut.get(i) / n);
+            result.add((double) inInDegrees.get(i) / n);
+            result.add((double) inOutDegrees.get(i) / n);
+            result.add((double) outInDegrees.get(i) / n);
+            result.add((double) outOutDegrees.get(i) / n);
+            result.add((double) biDirectional.get(i) / n);
+            result.add((double) nonBiDirectional.get(i) / n);
         }
-        result.add((double) inDegrees.get(inDegrees.size() - 1) / n);
-        result.add((double) outDegrees.get(inDegrees.size() - 1) / n);
-        result.add((double) inInDegrees.get(inDegrees.size() - 1) / n);
-        result.add((double) inOutDegrees.get(inDegrees.size() - 1) / n);
-        result.add((double) outInDegrees.get(inDegrees.size() - 1) / n);
-        result.add((double) outOutDegrees.get(inDegrees.size() - 1) / n);
+
+        result.add((double) inDegrees.stream().mapToInt(Integer::intValue).sum() / n);
+        result.add((double) outDegrees.stream().mapToInt(Integer::intValue).sum() / n);
+        result.add((double) inTimesOut.stream().mapToInt(Integer::intValue).sum() / n);
+        result.add((double) inInDegrees.stream().mapToInt(Integer::intValue).sum() / n);
+        result.add((double) inOutDegrees.stream().mapToInt(Integer::intValue).sum() / n);
+        result.add((double) outInDegrees.stream().mapToInt(Integer::intValue).sum() / n);
+        result.add((double) outOutDegrees.stream().mapToInt(Integer::intValue).sum() / n);
+        result.add((double) biDirectional.stream().mapToInt(Integer::intValue).sum() / n);
+        result.add((double) nonBiDirectional.stream().mapToInt(Integer::intValue).sum() / n);
 
         return result;
     }
