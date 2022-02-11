@@ -36,7 +36,7 @@ public class DFAS {
         //in die Lösungsmenge aufgenommen. Das Cleaning liefert unter Umständen gleichnamige
         //Integer. Daher hier negativ in die Lösung aufgenommen.
         for (Integer u : dfvsGraph.rootClean()) {
-            solution.add(-u -1_000_000);
+            solution.add(u);
         }
         DirectedGraph dfasGraph = new DirectedGraph(dfvsGraph, true);
         //Solange der Graph nicht gelöscht ist, werden weiter Knoten in die topologische
@@ -124,7 +124,7 @@ public class DFAS {
                 addToTopoRight.add(-vPlus);
                 notInTopo.remove(vPlus);
                 notInTopo.remove(-vPlus);
-                solution.add(vPlus);
+                solution.add(vPlus - 1);
                 dfasGraph.removeEdge(-vPlus, vPlus);
             }
 
