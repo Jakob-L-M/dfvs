@@ -1,8 +1,5 @@
 import java.io.*;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class utils {
 
@@ -51,21 +48,37 @@ public class utils {
             BufferedReader br = new BufferedReader(new FileReader("instances/optimal_solution_sizes.txt"));
             String line = br.readLine();
             while (line != null) {
+                String pref;
+                if (line.contains("synth")) {
+                    pref = "synthetic/";
+                } else {
+                    pref = "complex/";
+                }
                 String[] temp = line.split("\\s+");
-                res.put(temp[0], Integer.valueOf(temp[1]));
+                res.put(pref + temp[0], Integer.valueOf(temp[1]));
                 line = br.readLine();
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return res;
-    }
 
-    public static Map<String, Integer> loadSolSizes3() {
-        Map<String, Integer> res = new HashMap<>();
-        try {
-            BufferedReader br = new BufferedReader(new FileReader("instances/opt-sol3.txt"));
-            String line = br.readLine();
+            br = new BufferedReader(new FileReader("instances/opt-sol3.txt"));
+            line = br.readLine();
+            while (line != null) {
+                String[] temp = line.split("\\s+");
+                String pref;
+                if (line.contains("synth")) {
+                    pref = "synthetic3/";
+                } else {
+                    pref = "complex3/";
+                }
+                try {
+                    res.put(pref + temp[0], Integer.valueOf(temp[1]));
+                } catch (NumberFormatException e) {
+                    // catching timeout instances
+                    res.put(pref + temp[0], -1);
+                }
+                line = br.readLine();
+            }
+            br = new BufferedReader(new FileReader("instances/best_known_solutions.txt"));
+            line = br.readLine();
             while (line != null) {
                 String[] temp = line.split("\\s+");
                 try {
@@ -80,6 +93,55 @@ public class utils {
             e.printStackTrace();
         }
         return res;
+    }
+
+    public static Map<String, List<Integer>> loadSolutions() {
+        Map<String, List<Integer>> res = new HashMap<>();
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("graph-metadata/solutions_week2.csv"));
+            br.readLine(); // skip column name line
+
+            String line = br.readLine();
+
+            while (line != null) {
+                String s = line.substring(line.lastIndexOf(';') + 1);
+                String name = line.substring(0, line.indexOf(';'));
+                s = s.replace("[", "").replace("]", "");
+                String[] splits = s.split(", ");
+                List<Integer> sol = new ArrayList<>();
+                for (String split : splits) {
+                    sol.add(Integer.valueOf(split));
+                }
+                res.put(name, sol);
+                line = br.readLine();
+            }
+
+            br = new BufferedReader(new FileReader("graph-metadata/week5_small_sol.csv"));
+            br.readLine(); // skip column name line
+
+            line = br.readLine();
+
+            while (line != null) {
+                String s = line.substring(line.lastIndexOf(';') + 1);
+                String name = line.substring(0, line.indexOf(';'));
+                s = s.replace("[", "").replace("]", "");
+                String[] splits = s.split(", ");
+                List<Integer> sol = new ArrayList<>();
+                for (String split : splits) {
+                    sol.add(Integer.valueOf(split));
+                }
+                res.put(name, sol);
+                line = br.readLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return res;
+    }
+
+    public static double getSeconds(long timestamp, int decimals) {
+        return utils.round((double)(timestamp + System.nanoTime())/1_000_000_000, decimals);
     }
 
 }
