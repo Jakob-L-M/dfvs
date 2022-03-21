@@ -3,7 +3,6 @@ import com.google.common.collect.HashBiMap;
 
 import java.io.*;
 import java.util.*;
-import java.util.stream.IntStream;
 
 
 public class DirectedGraph implements Comparable<DirectedGraph> {
@@ -12,7 +11,6 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     Map<Integer, DirectedNode> nodeMap = new HashMap<>();
     BiMap<String, Integer> dict = HashBiMap.create();
     int k;
-    Stack<Integer> solution = new Stack<>();
     Map<Integer, Double> predictions = new HashMap<>();
 
     DirectedGraph(String fileName) {
@@ -74,6 +72,10 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
     public DirectedGraph() {
         name = "temp";
+    }
+
+    public DirectedNode getNode(Integer u) {
+        return nodeMap.get(u);
     }
 
     public Set<Integer> cleanGraph() {
@@ -402,6 +404,12 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return null;
     }
 
+    /**
+     * Inserts a new node into the graph. The Node will not have any edges by default.
+     *
+     * @param nid The id of the node. If the given node is already present it will not be overwritten
+     * @return Whether a new node has been added
+     */
     public boolean addNode(Integer nid) {
         if (!nodeMap.containsKey(nid)) {
             nodeMap.put(nid, new DirectedNode(nid));
@@ -409,6 +417,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         }
         return false;
     }
+
 
     public boolean addEdge(Integer preID, Integer postID, boolean stack) {
         DirectedNode preNode = nodeMap.get(preID);
@@ -470,10 +479,17 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     }
 
     public boolean hasAllNodes(Set<Integer> nodes) {
-        boolean allContained;
         for (Integer u : nodes) {
-            allContained = nodeMap.containsKey(u);
-            if (!allContained) return false;
+            if (!nodeMap.containsKey(u)) return false;
+        }
+        return true;
+    }
+
+    public boolean hasAllNodes(Deque<Integer> nodes) {
+        for (Integer i : nodes) {
+            if (!nodeMap.containsKey(i)) {
+                return false;
+            }
         }
         return true;
     }
@@ -481,15 +497,8 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     public List<Set<Integer>> cleanDigraphSet(List<Set<Integer>> digraphs) {
         List<Set<Integer>> cleanedDigraphs = new ArrayList<>();
         for (Set<Integer> digraph : digraphs) {
-            if (digraph.size() < 3) continue;
-            boolean containsAll = true;
-            for (Integer nodeID : digraph) {
-                if (!nodeMap.containsKey(nodeID)) {
-                    containsAll = false;
-                    break;
-                }
-            }
-            if (containsAll) cleanedDigraphs.add(digraph);
+            if (digraph.size() >= 3 && hasAllNodes(digraph))
+                cleanedDigraphs.add(digraph);
         }
         return cleanedDigraphs;
     }
@@ -498,6 +507,10 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return removeNode(nodeID, true);
     }
 
+    /**
+     * Inserts a checkpoint into the stack. When rebuildGraph() is called the DirectedGraph gets rebuild until the
+     * most recent checkpoint has been reached. A checkpoint is represented by a null-element.
+     */
     public void addStackCheckpoint() {
         stack.push(null);
     }
@@ -543,6 +556,12 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         System.out.println("Stack empty");
     }
 
+    /**
+     * Will remove a sink- or source-node. Additionally, all neighbours will be checked recursively to eliminated new sinks
+     * and sources immediately.
+     *
+     * @param nodeID The id of a know sink or source node
+     */
     public void removeSinkSource(Integer nodeID) {
         if (!nodeMap.containsKey(nodeID)) return;
         DirectedNode node = nodeMap.get(nodeID);
@@ -587,7 +606,21 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return findBestCycle(Integer.MAX_VALUE, Integer.MAX_VALUE);
     }
 
+    /**
+     * Method will find the 'best' (shortest) cycles of a graph. To decrease computation we fist search for 2-cycles
+     * since they are the shortest possible cycles, and we can search for them efficiently. If no cycle is found we will
+     * use breadth-first search (BFS) to find a cycle. The additional parameters are used to stop searching when certain
+     * conditions are met.
+     * To ensure the methods works, it should always be called on a cleaned graph. This especially means that each node
+     * has to lie in at least one cycle.
+     *
+     * @param sameCycleCount The amount of cycles with the same (shortest known) length to stop searching.
+     * @param limit          The maximum amount of cycles to search for.
+     * @return The best known cycle as a deque of nodeIds
+     */
     public Deque<Integer> findBestCycle(int sameCycleCount, int limit) {
+
+        // Checking for two-cycles
         for (Integer nodeId : nodeMap.keySet()) {
             int twoCycleNodeId = getNode(nodeId).isTwoCycle();
             if (twoCycleNodeId != -1) {
@@ -677,6 +710,15 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return cycle;
     }
 
+    /**
+     * Method to check if BFS has reached a given depth
+     *
+     * @param nodeId The if of the node that is checked
+     * @param start  The id of the BFS root node
+     * @param parent A parent map containing the path from nodeId to start
+     * @param limit  The maximum allowed path length
+     * @return Whether the path is below the given limit
+     */
     private boolean limitParentDepth(int nodeId, int start, Map<Integer, Integer> parent, int limit) {
         int c = 0;
         int cur = parent.get(nodeId);
@@ -687,20 +729,30 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return true;
     }
 
+    /**
+     * Main heuristic method. Follows the idea behind the heuristic flowchart.
+     *
+     * @param level               the depth of recursive calls. Deletion decisions are adjusted based on this depth.
+     * @param levelLimit          A minimal level to be reached before we try to solve with an optimal solver
+     * @param m                   A model that predicts a deletion confidence based on node parameters
+     * @param percentageReduction The amount by which the deletion cutoff is lowered.
+     * @return A Timer for debugging purposes. Should be void in a production version
+     */
     public TimerTuple deathByPacking(int level, int levelLimit, Model m, double percentageReduction) {
-        //int heurK = cleanGraph().size();
-        //Set<Integer> delete = cleanGraph();
-        //if (delete != null) heurK += delete.size();
+
         Timer t = new Timer(6, new String[]{"packing", "predData", "predictions", "cleaning", "dfvsSolve", "tarjan"});
+
+        // Cleaning and packing
+        // Given huge instances, packing takes (by far) the longest.
         this.k = Integer.MAX_VALUE;
         Set<Integer> heuristic = cleanGraph();
-
         Packing pack = new Packing(this);
-
         long time = -System.nanoTime();
+        // Calculate a Packing that consists of at most 5k cycles
         List<Deque<Integer>> cyclePacking = pack.newFindCyclePacking(4, 2, 5_000);
         t.addTime("packing", time + System.nanoTime());
 
+        // main while loop. As long as a non-empty packing exists we still need to delete more nodes.
         while (!cyclePacking.isEmpty()) {
             Set<Integer> changedNodes = new HashSet<>();
             List<Deque<Integer>> nonRemovedCycles = new ArrayList<>();
@@ -708,10 +760,12 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 int nodeToDelete = -1;
                 double prediction = -1.0;
 
-                if (!containsNodes(cyc)) {
+                // a node could have been removed due to cleaning after previous deletions
+                if (!hasAllNodes(cyc)) {
                     continue;
                 }
 
+                // calculation of deletion confidences for all nodes in the cycle
                 for (Integer curNode : cyc) {
 
                     double curPrediction;
@@ -749,18 +803,19 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                         prediction = curPrediction;
                     }
                 }
+
+                // If the best node satisfies the current cutoff it will be deleted.
                 if (prediction > 0.8 - percentageReduction) {
+                    removeNode(nodeToDelete);
+                    changedNodes.add(nodeToDelete);
+                }
+                // To reduce computation in following levels we will remove some cycles based on there length  and some
+                // randomness even if they do not satisfy the current cutoff
+                else if (Math.random() < 4 * Math.exp(-0.3 * cyc.size())) {
                     removeNode(nodeToDelete);
                     changedNodes.add(nodeToDelete);
                 } else {
                     nonRemovedCycles.add(cyc);
-                }
-            }
-
-            List<Deque<Integer>> cyclesToKeep = new ArrayList<>();
-            for (Deque<Integer> d : nonRemovedCycles) {
-                if (Math.random() < 4*Math.exp(-0.3*d.size())) {
-                    cyclesToKeep.add(d);
                 }
             }
 
@@ -771,7 +826,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             t.addTime("cleaning", time + System.nanoTime());
 
 
-            percentageReduction += 0.3*(double) (nonRemovedCycles.size())/cyclePacking.size();
+            percentageReduction += 0.3 * (double) (nonRemovedCycles.size()) / cyclePacking.size();
 
 
             if (nodeMap.isEmpty()) {
@@ -808,7 +863,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                             List<Integer> sol = Main.ilp(file + ".lp", 20.0);
                             t.addTime("dfvsSolve", time + System.nanoTime());
                             if (sol == null) {
-                                TimerTuple res = scc.deathByPacking(level++, levelLimit + 2, m,percentageReduction);
+                                TimerTuple res = scc.deathByPacking(level++, levelLimit + 2, m, percentageReduction);
                                 heuristic.addAll(res.getSolution());
                                 t.addTimer(res.getTimer());
                             } else {
@@ -820,64 +875,19 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 return new TimerTuple(t, heuristic);
             }
 
-            this.addStackCheckpoint();
-
             System.out.println("Total: " + cyclePacking.size() + " Removed: " +
-                    (cyclePacking.size()- nonRemovedCycles.size()) + " Keeping: " + cyclesToKeep.size());
-
-            for (Deque<Integer> cycle : cyclesToKeep) {
-                for (Integer node : cycle) {
-                    this.removeNode(node);
-                }
-            }
+                    (cyclePacking.size() - nonRemovedCycles.size()));
 
             cleanGraph();
 
             time = -System.nanoTime();
             cyclePacking = pack.newFindCyclePacking(5, 2, 1_500);
 
-            this.rebuildGraph();
-
-            cyclePacking.addAll(cyclesToKeep);
             t.addTime("packing", time + System.nanoTime());
-
-            if (cyclePacking.isEmpty()) {
-                return new TimerTuple(t, heuristic);
-            }
 
             level++;
         }
         return new TimerTuple(t, heuristic);
-    }
-
-    public boolean containsNodes(Deque<Integer> nodes) {
-        for (Integer i : nodes) {
-            if (!nodeMap.containsKey(i)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    public void unfixAll() {
-        for (DirectedNode node : nodeMap.values()) {
-            node.unfixNode();
-        }
-    }
-
-    public Set<Integer> getForbiddenNodes() {
-        Set<Integer> forbidden = new HashSet<>();
-        for (DirectedNode node : nodeMap.values()) {
-            if (node.isFixed()) forbidden.add(node.getNodeID());
-        }
-        return forbidden;
-    }
-
-    public void revertSolution(int v) {
-        int i = solution.pop();
-        while (!solution.isEmpty() && i != v) {
-            i = solution.pop();
-        }
     }
 
     public boolean containsNode(Integer u) {
@@ -888,83 +898,12 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         return nodeMap.get(u).getOutNodes().contains(v);
     }
 
-    public DirectedNode getNode(Integer u) {
-        return nodeMap.get(u);
-    }
-
     public int size() {
         return nodeMap.size();
     }
 
-    public String hash() {
-        StringBuilder hash = new StringBuilder();
-        for (Integer nodeId : nodeMap.keySet()) {
-            hash.append(nodeMap.get(nodeId).hashCode());
-        }
-        return hash.toString();
-    }
-
     /**
-     * !INCORRECT!/!UNFINISHED! Method to generate an gurobi-LP File with all simple Cycles
-     */
-    public void createLPFile() {
-
-        try {
-            //System.out.println(name);
-            BufferedWriter bw = new BufferedWriter(new FileWriter("ilps/" + name + ".lp"));
-            bw.write("Minimize\n");
-
-            StringBuilder variables = new StringBuilder();
-            StringBuilder binaries = new StringBuilder();
-
-            for (Integer nodeId : nodeMap.keySet()) {
-                variables.append("x").append(nodeId).append(" + ");
-                binaries.append("x").append(nodeId).append(" ");
-            }
-            bw.write(variables.substring(0, variables.lastIndexOf("+") - 1));
-
-            bw.write("\nSubject To\n");
-
-            Deque<Integer> cycle = findBestCycle();
-            int counter = 0;
-            //System.out.println("Graph before:");
-            //System.out.println(this);
-            while (cycle != null) {
-                StringBuilder constraint = new StringBuilder();
-                constraint.append('c').append(counter++).append(": ");
-                int parent = cycle.pop();
-                int first = parent;
-                constraint.append('x').append(parent).append(" + ");
-                for (Integer nodeId : cycle) {
-                    constraint.append('x').append(nodeId).append(" + ");
-                    if (!removeEdge(nodeId, parent, false)) {
-                        System.out.println("NO EDGE1");
-                    }
-                    parent = nodeId;
-                }
-                if (!removeEdge(first, parent)) {
-                    System.out.println("NO EDGE2" + " " + first + ", " + parent);
-                }
-                constraint.delete(constraint.length() - 3, constraint.length());
-                constraint.append(" >= 1");
-                bw.write(constraint + "\n");
-                cleanGraph(false);
-                cycle = findBestCycle();
-            }
-            bw.write("Binary\n");
-            bw.write(binaries.substring(0, binaries.length() - 1));
-            bw.write("\nEnd");
-
-            bw.close();
-            //System.out.println("Graph after:");
-            //System.out.println(this);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Creates an gurobi-LP file based on topological orders.
+     * Creates a gurobi-LP file based on topological orders.
      * Assumes that the graph is not empty.
      * Files is stored in ILPs/[complex(3) or synthetic(3)/name.lp].
      * Make sure the folders ILPs/complex, ILPs/synthetic, ILPs/complex3 and ILPs/synthetic3 exist.
@@ -1090,7 +1029,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
             inDegrees.add(node.getInDegree());
             outDegrees.add(node.getOutDegree());
-            inTimesOut.add(node.getInDegree()*node.getOutDegree());
+            inTimesOut.add(node.getInDegree() * node.getOutDegree());
 
             int inInNodes = 0;
             int inOutNodes = 0;
@@ -1127,7 +1066,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
         result.add((double) m / n);
 
-        for (int i : List.of(0, inDegrees.size()/2, inDegrees.size()-1)) {
+        for (int i : List.of(0, inDegrees.size() / 2, inDegrees.size() - 1)) {
             result.add((double) inDegrees.get(i) / n);
             result.add((double) outDegrees.get(i) / n);
             result.add((double) inTimesOut.get(i) / n);
