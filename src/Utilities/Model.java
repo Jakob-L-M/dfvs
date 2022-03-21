@@ -1,3 +1,5 @@
+package Utilities;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,6 +25,7 @@ public class Model {
 
     /**
      * Essentially does a NN-Calculation
+     *
      * @param in List of input values. Has to have a matching size to the network
      * @return prediction. Lies between 0 and 1
      */

@@ -1,3 +1,7 @@
+package Graph;
+
+import Utilities.Timer;
+import Utilities.*;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 
@@ -8,12 +12,12 @@ import java.util.*;
 public class DirectedGraph implements Comparable<DirectedGraph> {
     final String name;
     final Stack<StackTuple> stack = new Stack<>();
-    Map<Integer, DirectedNode> nodeMap = new HashMap<>();
+    public Map<Integer, DirectedNode> nodeMap = new HashMap<>();
     BiMap<String, Integer> dict = HashBiMap.create();
-    int k;
+    public int k;
     Map<Integer, Double> predictions = new HashMap<>();
 
-    DirectedGraph(String fileName) {
+    public DirectedGraph(String fileName) {
         try {
             BufferedReader reader = new BufferedReader(new FileReader(fileName));
             String currentLine;
@@ -47,7 +51,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
      * @param fileName Path to file
      * @param paceInst ture -> PACE Instance
      */
-    DirectedGraph(String fileName, boolean paceInst) {
+    public DirectedGraph(String fileName, boolean paceInst) {
         try {
             BufferedReader reader = new BufferedReader(new FileReader(fileName));
             String currentLine = reader.readLine();
@@ -324,7 +328,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
      * Calculates the max-flow value of a node and finds all petal nodes.
      *
      * @param nodeId id of the node that should be calculated
-     * @return Tuple. Tuple.value() gives the max-flow, Tuple.set() is a set of all nodes
+     * @return Utilities.Tuple. Utilities.Tuple.value() gives the max-flow, Utilities.Tuple.set() is a set of all nodes
      * present in any flower leave or the flower center itself.
      */
     public Tuple calculatePetal(int nodeId, int limit) {
@@ -524,31 +528,31 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 return;
             }
 
-            if (stackTuple.type == StackTuple.GraphType.NODE) {
+            if (stackTuple.getType() == StackTuple.GraphType.NODE) {
                 // node are always removed and never added
 
-                int nodeId = stackTuple.node.getNodeID();
+                int nodeId = stackTuple.getNode().getNodeID();
 
                 addNode(nodeId); //only added if not present
 
-                for (Integer outNode : stackTuple.node.getOutNodes()) {
+                for (Integer outNode : stackTuple.getNode().getOutNodes()) {
                     addNode(outNode); //only added if not present
                     addEdge(nodeId, outNode, false);
                 }
 
-                for (Integer inNode : stackTuple.node.getInNodes()) {
+                for (Integer inNode : stackTuple.getNode().getInNodes()) {
                     addNode(inNode); //only added if not present
                     addEdge(inNode, nodeId, false);
                 }
 
-                nodeMap.get(nodeId).setPedal(stackTuple.node.getPedal());
+                nodeMap.get(nodeId).setPedal(stackTuple.getNode().getPedal());
 
-            } else if (stackTuple.type == StackTuple.GraphType.EDGE) {
+            } else if (stackTuple.getType() == StackTuple.GraphType.EDGE) {
                 // edges are always added (chain cleaning)
-                if (stackTuple.added) {
-                    removeEdge(stackTuple.from, stackTuple.to, false);
+                if (stackTuple.isAdded()) {
+                    removeEdge(stackTuple.getFrom(), stackTuple.getTo(), false);
                 } else {
-                    addEdge(stackTuple.from, stackTuple.to, false);
+                    addEdge(stackTuple.getFrom(), stackTuple.getTo(), false);
                 }
             }
         }
@@ -736,11 +740,11 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
      * @param levelLimit          A minimal level to be reached before we try to solve with an optimal solver
      * @param m                   A model that predicts a deletion confidence based on node parameters
      * @param percentageReduction The amount by which the deletion cutoff is lowered.
-     * @return A Timer for debugging purposes. Should be void in a production version
+     * @return A Utilities.Timer for debugging purposes. Should be void in a production version
      */
     public TimerTuple deathByPacking(int level, int levelLimit, Model m, double percentageReduction) {
 
-        Timer t = new Timer(6, new String[]{"packing", "predData", "predictions", "cleaning", "dfvsSolve", "tarjan"});
+        Utilities.Timer t = new Timer(6, new String[]{"packing", "predData", "predictions", "cleaning", "dfvsSolve", "tarjan"});
 
         // Cleaning and packing
         // Given huge instances, packing takes (by far) the longest.

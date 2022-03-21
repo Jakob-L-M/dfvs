@@ -1,16 +1,18 @@
-import java.util.Set;
+package Utilities;
+
+import Graph.DirectedNode;
 
 public class StackTuple {
 
-    GraphType type;
-    boolean added; //true if added false if removed
+    private final GraphType type;
+    private final boolean added; //true if added false if removed
 
     // Node-only fields
-    DirectedNode node;
+    private DirectedNode node;
 
     // Edge-only fields
-    int from;
-    int to;
+    private int from;
+    private int to;
 
     public StackTuple(boolean added, DirectedNode node) {
         this.added = added;
@@ -23,6 +25,26 @@ public class StackTuple {
         this.type = GraphType.EDGE;
         this.from = from;
         this.to = to;
+    }
+
+    public GraphType getType() {
+        return type;
+    }
+
+    public boolean isAdded() {
+        return added;
+    }
+
+    public DirectedNode getNode() {
+        return node;
+    }
+
+    public int getFrom() {
+        return from;
+    }
+
+    public int getTo() {
+        return to;
     }
 
     @Override

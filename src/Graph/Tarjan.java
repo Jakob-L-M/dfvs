@@ -1,3 +1,5 @@
+package Graph;
+
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 

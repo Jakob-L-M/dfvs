@@ -1,3 +1,12 @@
+package Graph;
+
+import Graph.DirectedGraph;
+import Graph.Packing;
+import Graph.Tarjan;
+import Utilities.Model;
+import Utilities.Timer;
+import Utilities.TimerTuple;
+import Utilities.utils;
 import gurobi.*;
 
 import java.io.*;
@@ -266,7 +275,7 @@ public class Main {
         Model m = utils.loadMatrix("mat.txt");
         TimerTuple r = graph.deathByPacking(0, 1, m, 0.1);
         Set<Integer> res = r.getSolution();
-        Timer t = r.getTimer();
+        Utilities.Timer t = r.getTimer();
 
         solution.addAll(res);
 
@@ -295,7 +304,7 @@ public class Main {
         //productionMain("instances/sheet5-heuristic/h_119");
         // #### DEVELOP ONLY ####
 
-        //heuristic();
+        heuristic();
 
         // All e_ Instances
 
@@ -305,7 +314,7 @@ public class Main {
         // With 5k Packing Limit:
         // Took: 2:2.26min, in total off by: -8148 while total k's: 1094721
 
-        createGraphData("instances/all_instances.txt", "results/reduction_all.csv");
+        //createGraphData("instances/all_instances.txt", "results/reduction_all.csv");
 
     }
 
@@ -352,7 +361,7 @@ public class Main {
         int kSum = 0;
         long time = -System.nanoTime();
         String line;
-        Timer mainTimer = new Timer(6, new String[]{"packing", "predData", "predictions", "cleaning", "dfvsSolve", "tarjan"});
+        Utilities.Timer mainTimer = new Timer(6, new String[]{"packing", "predData", "predictions", "cleaning", "dfvsSolve", "tarjan"});
         while ((line = br.readLine()) != null) {
             c++;
             String name = line.substring(line.indexOf("instances/") + 10);
@@ -420,7 +429,7 @@ public class Main {
        br = new BufferedReader(new FileReader(fileToRun));
        String instance = br.readLine();
 
-       //Model m = utils.loadMatrix("graph-metadata/synth_mat_v2.txt");
+       //Model m = Utilities.utils.loadMatrix("graph-metadata/synth_mat_v2.txt");
 
        while (instance != null) {
            c++;
@@ -521,7 +530,7 @@ public class Main {
 
             long cleanTime = -System.nanoTime();
             Set<Integer> cleanedNodes = graph.rootClean();
-            double cleanSec = utils.round((cleanTime + System.nanoTime()) / 1_000_000_000.0, 4);
+            double cleanSec = Utilities.utils.round((cleanTime + System.nanoTime()) / 1_000_000_000.0, 4);
 
             long digraphTime = -System.nanoTime();
             Packing packing = new Packing(graph);
@@ -541,7 +550,7 @@ public class Main {
                 continue;
             }
 
-            double digraphSec = utils.round((digraphTime + System.nanoTime()) / 1_000_000_000.0, 4);
+            double digraphSec = Utilities.utils.round((digraphTime + System.nanoTime()) / 1_000_000_000.0, 4);
 
             long fileTime = -System.nanoTime();
 
@@ -550,7 +559,7 @@ public class Main {
             double fileSec = 0.0;
             if (graph.nodeMap.size() > 0) {
                 graph.createTopoLPFile(digraphs);
-                fileSec = utils.round((fileTime + System.nanoTime()) / 1_000_000_000.0, 4);
+                fileSec = Utilities.utils.round((fileTime + System.nanoTime()) / 1_000_000_000.0, 4);
 
                 k = ilp("ILPs/" + instanceName, Math.max(0.001, timelimit - fileSec - digraphSec));
             }
@@ -559,7 +568,7 @@ public class Main {
                 System.out.println(";-1;" + fileSec + ";" + cleanSec + ";" + digraphSec + ";" + timelimit + ";[]");
             } else {
 
-                double sec = utils.round((time + System.nanoTime()) / 1_000_000_000.0, 4);
+                double sec = Utilities.utils.round((time + System.nanoTime()) / 1_000_000_000.0, 4);
                 System.out.println(";" + (k.size() + kClean) + ";" + fileSec + ";" + cleanSec + ";" + digraphSec + ";" + sec + ";" + k);
             }
             instance = br.readLine();
