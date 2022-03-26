@@ -2,8 +2,6 @@ package Graph;
 
 import Utilities.Timer;
 import Utilities.*;
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
 
 import java.io.*;
 import java.util.*;
@@ -13,65 +11,43 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     final String name;
     final Stack<StackTuple> stack = new Stack<>();
     public Map<Integer, DirectedNode> nodeMap = new HashMap<>();
-    BiMap<String, Integer> dict = HashBiMap.create();
     public int k;
     Map<Integer, Double> predictions = new HashMap<>();
-
-    public DirectedGraph(String fileName) {
-        try {
-            BufferedReader reader = new BufferedReader(new FileReader(fileName));
-            String currentLine;
-
-            // using a unique id for each node
-            int count = 0;
-
-            while ((currentLine = reader.readLine()) != null) {
-
-                if (currentLine.contains("#") || currentLine.contains("%") || currentLine.isEmpty()) continue;
-                String[] nodes = currentLine.split(" ");
-
-                // creating a new node if its the first edge of that node
-                if (!dict.containsKey(nodes[0])) dict.put(nodes[0], count++);
-                if (!dict.containsKey(nodes[1])) dict.put(nodes[1], count++);
-
-                addNode(dict.get(nodes[0]));
-                addNode(dict.get(nodes[1]));
-
-                addEdge(dict.get(nodes[0]), dict.get(nodes[1]));
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        name = fileName.substring(fileName.indexOf("instances/") + 10);
-    }
 
     /**
      * PACE Constructor
      *
      * @param fileName Path to file
-     * @param paceInst ture -> PACE Instance
      */
-    public DirectedGraph(String fileName, boolean paceInst) {
+    public DirectedGraph(String fileName) {
         try {
             BufferedReader reader = new BufferedReader(new FileReader(fileName));
-            String currentLine = reader.readLine();
+
+            String currentLine = reader.readLine(); // First line contains metadata
+
+            // create all nodes
             for (int i = 1; i <= Integer.parseInt(currentLine.split(" ")[0]); i++) {
-                dict.put(Integer.toString(i), i);
                 addNode(i);
             }
-            int count = 1;
+
+            int nodeId = 1;
             while ((currentLine = reader.readLine()) != null) {
-                if (currentLine.contains("#") || currentLine.contains("%") || currentLine.isEmpty()) continue;
+                if (currentLine.contains("%")) continue;
+                if (currentLine.isEmpty()) {
+                    nodeId++;
+                    continue;
+                }
                 String[] nodes = currentLine.split(" ");
                 for (String v : nodes) {
-                    addEdge(count, Integer.parseInt(v));
+                    System.out.println(nodeId+ " " +Integer.parseInt(v));
+                    addEdge(nodeId, Integer.parseInt(v));
                 }
-                count++;
+                nodeId++;
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
-        name = fileName.substring(fileName.indexOf("instances/") + 10);
+        name = fileName.substring(fileName.indexOf("instances/instances/") + 20);
     }
 
     public DirectedGraph() {
@@ -742,7 +718,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
      * @param percentageReduction The amount by which the deletion cutoff is lowered.
      * @return A Utilities.Timer for debugging purposes. Should be void in a production version
      */
-    public TimerTuple deathByPacking(int level, int levelLimit, Model m, double percentageReduction) {
+    public TimerTuple heuristicSolution(int level, int levelLimit, Model m, double percentageReduction) {
 
         Utilities.Timer t = new Timer(6, new String[]{"packing", "predData", "predictions", "cleaning", "dfvsSolve", "tarjan"});
 
@@ -809,13 +785,13 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 }
 
                 // If the best node satisfies the current cutoff it will be deleted.
-                if (prediction > 0.8 - percentageReduction) {
+                if (prediction > 0.6 - percentageReduction) {
                     removeNode(nodeToDelete);
                     changedNodes.add(nodeToDelete);
                 }
                 // To reduce computation in following levels we will remove some cycles based on there length  and some
                 // randomness even if they do not satisfy the current cutoff
-                else if (Math.random() < 4 * Math.exp(-0.3 * cyc.size())) {
+                else if (Math.random() < 3 * Math.exp(-0.3 * cyc.size())) {
                     removeNode(nodeToDelete);
                     changedNodes.add(nodeToDelete);
                 } else {
@@ -830,7 +806,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             t.addTime("cleaning", time + System.nanoTime());
 
 
-            percentageReduction += 0.3 * (double) (nonRemovedCycles.size()) / cyclePacking.size();
+            percentageReduction += 0.15 * (double) (nonRemovedCycles.size()) / cyclePacking.size();
 
 
             if (nodeMap.isEmpty()) {
@@ -839,7 +815,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
 
             if (level >= levelLimit) {
                 if (this.size() > 5_000) {
-                    TimerTuple res = this.deathByPacking(level + 1, levelLimit + 2, m, percentageReduction);
+                    TimerTuple res = this.heuristicSolution(level + 1, levelLimit + 2, m, percentageReduction);
                     heuristic.addAll(res.getSolution());
                     t.addTimer(res.getTimer());
                 } else {
@@ -852,22 +828,22 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                     for (DirectedGraph scc : sccs) {
                         if (scc.size() > 100) {
                             if (scc.size() > 1000) {
-                                TimerTuple res = scc.deathByPacking(level + 1, levelLimit + 2, m, percentageReduction);
+                                TimerTuple res = scc.heuristicSolution(level + 1, levelLimit + 2, m, percentageReduction);
                                 heuristic.addAll(res.getSolution());
                                 t.addTimer(res.getTimer());
                             } else {
-                                TimerTuple res = scc.deathByPacking(level + 1, levelLimit + 1, m, percentageReduction);
+                                TimerTuple res = scc.heuristicSolution(level + 1, levelLimit + 1, m, percentageReduction);
                                 heuristic.addAll(res.getSolution());
                                 t.addTimer(res.getTimer());
                             }
                         } else {
                             time = -System.nanoTime();
                             String file = name.replace('/', '_');
-                            scc.createTopoLPFile(file + ".lp");
-                            List<Integer> sol = Main.ilp(file + ".lp", 20.0);
+                            scc.createTopoLPFile("instances/temp.lp");
+                            List<Integer> sol = Main.ilp("instances/temp.lp", 20.0);
                             t.addTime("dfvsSolve", time + System.nanoTime());
                             if (sol == null) {
-                                TimerTuple res = scc.deathByPacking(level++, levelLimit + 2, m, percentageReduction);
+                                TimerTuple res = scc.heuristicSolution(level++, levelLimit + 2, m, percentageReduction);
                                 heuristic.addAll(res.getSolution());
                                 t.addTimer(res.getTimer());
                             } else {
@@ -880,7 +856,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             }
 
             System.out.println("Total: " + cyclePacking.size() + " Removed: " +
-                    (cyclePacking.size() - nonRemovedCycles.size()));
+                    (cyclePacking.size() - nonRemovedCycles.size()) + " Percentage: " + (0.8-percentageReduction));
 
             cleanGraph();
 
@@ -992,6 +968,19 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
             e.printStackTrace();
         }
         return 0L;
+    }
+
+    public void safeSolution(Collection<Integer> solution) {
+        try {
+            BufferedWriter bw = new BufferedWriter(new FileWriter("instances/solutions/" + name));
+            for (Integer node : solution) {
+                bw.write(node + "\n");
+            }
+            bw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
     }
 
     public long createTopoLPFile() {
