@@ -39,7 +39,6 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                 }
                 String[] nodes = currentLine.split(" ");
                 for (String v : nodes) {
-                    System.out.println(nodeId+ " " +Integer.parseInt(v));
                     addEdge(nodeId, Integer.parseInt(v));
                 }
                 nodeId++;
@@ -838,9 +837,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                             }
                         } else {
                             time = -System.nanoTime();
-                            String file = name.replace('/', '_');
-                            scc.createTopoLPFile("instances/temp.lp");
-                            List<Integer> sol = Main.ilp("instances/temp.lp", 20.0);
+                            List<Integer> sol = new ArrayList<>(Main.dfvsSolve(this));
                             t.addTime("dfvsSolve", time + System.nanoTime());
                             if (sol == null) {
                                 TimerTuple res = scc.heuristicSolution(level++, levelLimit + 2, m, percentageReduction);
@@ -1179,5 +1176,39 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
     @Override
     public int compareTo(DirectedGraph o) {
         return Integer.compare(this.size(), o.size());
+    }
+
+    /**
+     * Saves the graph to a file in metis format. Will automatically adjust ids
+     * @param name Instance name of the new file
+     */
+    public void saveToFile(String name) {
+        // #### Reducing nodeIds to be in the interval [1, n]
+        Map<Integer, Integer> idMap = new HashMap<>();
+        int counter = 1;
+
+        // filling id map. Each (unique) nodeId will be mapped to a unique position in [1,n]
+        for (Integer nodeId : nodeMap.keySet()) {
+            idMap.put(nodeId, counter);
+            counter++;
+        }
+        // #### end of id adjustment
+
+        // #### writing metis file
+        try {
+            BufferedWriter bw = new BufferedWriter(new FileWriter("instances/instances/" + name));
+            bw.write(nodeMap.keySet().size() + " " +
+                    nodeMap.values().stream().mapToInt(DirectedNode::getOutDegree).sum() + " 0\n");
+            for (DirectedNode node : nodeMap.values()) {
+                for (Integer outNode : node.getOutNodes()) {
+                    bw.write(idMap.get(outNode) + " ");
+                }
+                bw.write("\n");
+            }
+            bw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
     }
 }
