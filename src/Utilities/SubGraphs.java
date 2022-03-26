@@ -3,10 +3,7 @@ package Utilities;
 import Graph.DirectedGraph;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 public class SubGraphs {
 
@@ -16,24 +13,36 @@ public class SubGraphs {
             String path = file.getPath();
             String name = file.getName();
 
+            if (name.contains("_s")) continue;
+
             System.out.println("Generating Subgraphs for: " + name);
 
             DirectedGraph g = new DirectedGraph(path);
-            g.rootClean();
+            g.k = Integer.MAX_VALUE;
+            g.cleanGraph();
 
             if (g.nodeMap.size() > 350) {
-                int iterations = Math.max(10, g.nodeMap.size()/100);
+                int iterations = Math.min(25,Math.max(10, g.nodeMap.size()/250));
 
                 List<Integer> nodeIds = new ArrayList<>(g.nodeMap.keySet());
 
                 for (int c = 1; c <= iterations; c++) {
                     Collections.shuffle(nodeIds);
                     g.addStackCheckpoint();
-                    int size = (int) (175 + Math.random()*155);
+                    int size = (int) (75 + Math.random()*275);
                     int i = 0;
                     while (g.nodeMap.size() > size) {
-                        g.removeNode(nodeIds.get(i++));
-                        g.rootClean();
+                        int nodeToDelete = nodeIds.get(i);
+
+                        if (!g.nodeMap.containsKey(nodeToDelete)) {
+                            i++;
+                            continue;
+                        }
+
+                        Set<Integer> neighbours = new HashSet<>(g.nodeMap.get(nodeToDelete).getInNodes());
+                        neighbours.addAll(g.nodeMap.get(nodeToDelete).getOutNodes());
+                        g.removeNode(nodeToDelete);
+                        g.rootClean(neighbours, true);
                     }
                     if (!g.nodeMap.isEmpty()) {
                         g.saveToFile(name + "_s" + c + "_" + g.nodeMap.size());
