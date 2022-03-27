@@ -73,6 +73,8 @@ public class Verifier {
         saveBestKnown(best_known);
 
         evaluateDifferenceMap(diffMap);
+
+        System.out.println("Total difference in k: " + diffMap.values().stream().mapToInt(List::size).sum());
     }
 
     private static void saveBestKnown(Map<String, Integer> best_known) {
