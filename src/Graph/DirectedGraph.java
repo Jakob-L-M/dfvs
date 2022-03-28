@@ -825,7 +825,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                     t.addTime("tarjan", time + System.nanoTime());
 
                     for (DirectedGraph scc : sccs) {
-                        if (scc.size() > 100) {
+                        if (scc.size() > 0) {
                             if (scc.size() > 1000) {
                                 TimerTuple res = scc.heuristicSolution(level + 1, levelLimit + 2, m, percentageReduction);
                                 heuristic.addAll(res.getSolution());
@@ -836,6 +836,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
                                 t.addTimer(res.getTimer());
                             }
                         } else {
+                            System.out.println("solving correct");
                             time = -System.nanoTime();
                             List<Integer> sol = new ArrayList<>(Main.dfvsSolve(this));
                             t.addTime("dfvsSolve", time + System.nanoTime());
