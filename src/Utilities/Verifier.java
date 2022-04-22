@@ -34,7 +34,7 @@ public class Verifier {
         List<String> incorrectInstances = new ArrayList<>();
 
         int counter = 0;
-        System.out.print("Running Verifier... 00.00%");
+        System.out.print("Running Verifier... 00,00%");
 
         File[] files = Objects.requireNonNull(new File("instances/solutions/").listFiles());
 
@@ -54,7 +54,7 @@ public class Verifier {
             }
             counter++;
 
-            double percent = utils.round((double)(counter*100)/numFiles, 2);
+            double percent = utils.round((double) (counter * 100) / numFiles, 2);
 
             System.out.print("\b\b\b\b\b");
             if (percent >= 10.0) System.out.print("\b");
@@ -74,7 +74,8 @@ public class Verifier {
 
         evaluateDifferenceMap(diffMap);
 
-        System.out.println("Total difference in k: " + diffMap.values().stream().mapToInt(List::size).sum());
+        int kDiff = diffMap.keySet().stream().mapToInt(key -> key * diffMap.get(key).size()).sum();
+        System.out.println("Total difference in k: " + ((kDiff < 0) ? "" : "+") + kDiff);
     }
 
     private static void saveBestKnown(Map<String, Integer> best_known) {
@@ -94,47 +95,44 @@ public class Verifier {
 
     /**
      * Prints the pace-score as well as the best and worse 10 instances
+     *
      * @param diffMap the differences of the current solutions and the best known solutions
      */
     private static void evaluateDifferenceMap(Map<Integer, List<String>> diffMap) {
-        int mapSize = diffMap.size();
         List<Integer> keys = new ArrayList<>(diffMap.keySet());
 
-        // best 10:
+        // max number of instances to print:
+        final int topK = 10;
+
+        // best instances -> decrease in k
         int i = 0;
         int k = 0;
         System.out.println("\nBest Instances:");
-        while (i < 10) {
-            for (int currentList = 0; i < 10 && currentList < diffMap.get(keys.get(k)).size(); i++, currentList++) {
-                int key = keys.get(k);
-                String instance = diffMap.get(k).get(currentList);
+        while (i < 10 && k < keys.size()) {
+            int key = keys.get(k);
+            if (key >= 0) break;
+            for (int instanceNumber = 0; i < topK && instanceNumber < diffMap.get(key).size(); i++, instanceNumber++) {
+                String instance = diffMap.get(key).get(instanceNumber);
 
-                if (key >= 0) {
-                    System.out.println("+" + key + " " + instance);
-                }
-                else {
-                    System.out.println(key + " " + instance);
-                }
+                System.out.println(key + " " + instance);
             }
             k++;
         }
 
-        // worst 10:
+        // worst instances -> increase in k
         System.out.println("\nWorst Instances:");
         i = 0;
-        k = mapSize - 1;
-        while (i < 10) {
+        k = keys.size() - 1;
+        while (i < 10 && k >= 0) {
             int key = keys.get(k);
-            for (int currentList = 0; i < 10 && currentList < diffMap.get(key).size(); i++, currentList++) {
 
-                String instance = diffMap.get(k).get(currentList);
+            if (key <= 0) break;
+            for (int currentList = 0; i < topK && currentList < diffMap.get(key).size(); i++, currentList++) {
 
-                if (key >= 0) {
-                    System.out.println("+" + key + " " + instance);
-                }
-                else {
-                    System.out.println(key + " " + instance);
-                }
+                String instance = diffMap.get(key).get(currentList);
+
+                System.out.println("+" + key + " " + instance);
+
             }
             k--;
         }
