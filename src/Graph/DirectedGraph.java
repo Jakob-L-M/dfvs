@@ -8,7 +8,7 @@ import java.util.*;
 
 
 public class DirectedGraph implements Comparable<DirectedGraph> {
-    final String name;
+    public final String name;
     final Stack<StackTuple> stack = new Stack<>();
     public Map<Integer, DirectedNode> nodeMap = new HashMap<>();
     public int k;
@@ -46,7 +46,7 @@ public class DirectedGraph implements Comparable<DirectedGraph> {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        name = fileName.substring(fileName.indexOf("instances/instances/") + 20);
+        name = fileName.substring(fileName.indexOf("instances/instances/") + 21);
     }
 
     public DirectedGraph() {

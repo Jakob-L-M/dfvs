@@ -1,18 +1,16 @@
 package Graph;
 
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
-
 import java.util.*;
 
 public class Tarjan {
     private final int n;
     private final DirectedGraph graph;
-    BiMap<Integer, Integer> dict = HashBiMap.create();
     private int nodeCount = 1;
     private int[] lowLinks, tarjanIDs;
     private boolean[] stacked;
     private Deque<Integer> stack;
+    private final Map<Integer, Integer> dict = new HashMap<>();
+    private final Map<Integer, Integer> inverseDict = new HashMap<>();
 
     public Tarjan(DirectedGraph graph) {
         this.graph = graph;
@@ -20,7 +18,9 @@ public class Tarjan {
         tarjanIDs = new int[n];
         int count = 0;
         for (Integer key : graph.nodeMap.keySet()) {
-            dict.put(key, count++);
+            dict.put(key, count);
+            inverseDict.put(count,key);
+            count++;
         }
         lowLinks = new int[n];
         stacked = new boolean[n];
@@ -42,7 +42,7 @@ public class Tarjan {
         stack.push(i);
         stacked[i] = true;
         tarjanIDs[i] = lowLinks[i] = nodeCount++;
-        for (int post : graph.nodeMap.get(dict.inverse().get(i)).getOutNodes()) {
+        for (int post : graph.nodeMap.get(inverseDict.get(i)).getOutNodes()) {
             post = dict.get(post);
             if (tarjanIDs[post] == 0) tarjanDFS(post);
             if (stacked[post]) lowLinks[i] = Math.min(lowLinks[i], lowLinks[post]);
@@ -64,7 +64,7 @@ public class Tarjan {
             if (!sccMap.containsKey(lowLinks[i])) {
                 sccMap.put(lowLinks[i], new ArrayList<>());
             }
-            sccMap.get(lowLinks[i]).add(dict.inverse().get(i));
+            sccMap.get(lowLinks[i]).add(inverseDict.get(i));
         }
         return sccMap;
     }

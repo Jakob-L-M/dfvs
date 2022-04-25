@@ -10,7 +10,7 @@ public class Packing {
     private Set<Integer> safeToDeleteDigraphNodes;
     private List<Set<Integer>> digraphs;
 
-    Packing(DirectedGraph graph) {
+    public Packing(DirectedGraph graph) {
         this.graph = graph;
     }
 
