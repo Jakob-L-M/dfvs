@@ -9,6 +9,20 @@ import java.util.*;
 
 public class DataCreation {
 
+    static GRBEnv env;
+
+    static {
+        try {
+            env = new GRBEnv();
+            env.set(GRB.IntParam.OutputFlag, 0);
+            double timelimit = 20.0;
+            env.set(GRB.DoubleParam.TimeLimit, timelimit);
+            env.start();
+        } catch (GRBException e) {
+            e.printStackTrace();
+        }
+    }
+
     public static void createSolutions() throws GRBException, IOException {
 
         System.out.print("# ");
@@ -39,7 +53,7 @@ public class DataCreation {
 
             graph.createTopoLPFile("temp.lp");
 
-            List<Integer> sol = ilp("temp.lp", 60.0, env);
+            List<Integer> sol = ilp("temp.lp", 60.0);
 
             if (sol == null) {
                 System.out.println("Timeout for " + graph.name);
@@ -78,7 +92,7 @@ public class DataCreation {
 
                 graph.createTopoLPFile("temp.lp");
 
-                List<Integer> tSol = ilp("temp.lp", 180.0, env);
+                List<Integer> tSol = ilp("temp.lp", 180.0);
 
                 if (tSol == null) {
                     graph.rebuildGraph();
@@ -97,7 +111,7 @@ public class DataCreation {
         if (foundSols > 0) System.out.println("\t Found " + foundSols + " more solutions");
     }
 
-    public static List<Integer> ilp(String file, double timelimit, GRBEnv env) {
+    public static List<Integer> ilp(String file, double timelimit) {
 
         try {
             GRBModel model = new GRBModel(env, file);
@@ -143,16 +157,21 @@ public class DataCreation {
     }
 
     private static void createNodeData(int iterations, Map<String, List<Integer>> solutions, BufferedWriter bw, String instance, String name) throws IOException {
+
+        if (!solutions.containsKey(name)) return;
+
         DirectedGraph g = new DirectedGraph(instance);
         g.k = Integer.MAX_VALUE;
         g.cleanGraph();
+
         Packing p = new Packing(g);
         g.removeAllNodes(p.getSafeToDeleteDigraphNodes(true));
-        if (!solutions.containsKey(name)) return;
+
+        g.cleanGraph();
+
         List<Integer> sol = new ArrayList<>(solutions.get(name));
-        System.out.print(" " + sol.size());
         for (int i = 0; i < iterations; i++) {
-            int b = new Random().nextInt(Math.max(1, sol.size() - 2));
+            int b = new Random().nextInt(Math.max(1, sol.size()/3));
             Collections.shuffle(sol);
             for (int j = 0; j < b; j++) {
                 g.removeNode(sol.get(j));
@@ -163,27 +182,36 @@ public class DataCreation {
     }
 
     private static void nodesMeta() throws IOException {
-        String fileToSave = "./results/nodes_v5.csv";
+        String fileToSave = "./graph-metadata/nodes_v7.csv";
 
         Map<String, List<Integer>> solutions = utils.loadSolutions("graph-metadata/nodeData.csv");
-        System.out.println(solutions.get("sheet5-heuristic/e_005"));
 
         BufferedWriter bw = new BufferedWriter(new FileWriter(fileToSave));
 
-        bw.write("instance,nodeId,1,2,3,4,5,6,7,8,9,10,11\n");
+        int iterations = 25;
+
+        bw.write("instance,nodeId");
+
+        // prep columns that carry features. Size should be equal to node data vector
+        for (int i = 0; i < 11; i++) {
+            bw.write("," + i);
+        }
+        bw.write("\n");
+
         for (File instance : Objects.requireNonNull(new File("instances/instances/").listFiles())) {
             String name = instance.getName();
 
             if (!solutions.containsKey(name)) continue;
+            if (solutions.get(name).size() < 4) continue;
 
             System.out.println("Creating data for: " + name);
 
-            createNodeData(10 + (int)(Math.random()*solutions.get(name).size()), solutions, bw, instance.getPath(), name);
+            createNodeData(iterations, solutions, bw, instance.getPath(), name);
         }
     }
 
 
     public static void main(String[] args) throws GRBException, IOException {
-        createSolutions();
+        nodesMeta();
     }
 }
