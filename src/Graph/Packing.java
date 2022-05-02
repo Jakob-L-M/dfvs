@@ -1,8 +1,5 @@
 package Graph;
 
-import Utilities.utils;
-
-import java.io.File;
 import java.util.*;
 
 public class Packing {
@@ -14,30 +11,6 @@ public class Packing {
         this.graph = graph;
     }
 
-    public static void main(String[] args) {
-        File complexInst = new File("instances/sheet5-heuristic");
-        System.out.println("name \t cleanTime \t digraphTime \t newPacking \t newTime \t oldPacking \t oldTime");
-        for (String ins : List.of("e_159", "e_169", "e_177", "h_133", "h_157", "h_171", "h_179", "h_187", "h_189")) {
-            String name = "instances\\sheet5-heuristic\\" + ins;
-            if(name.contains(".new")) continue;
-            DirectedGraph g = new DirectedGraph(name);
-            Packing p = new Packing(g);
-            name = name.substring(name.lastIndexOf('\\') + 1);
-            System.out.print(name);
-            long time = -System.nanoTime();
-            g.rootClean(null, false);
-            double cleanTime = utils.round((double) (time+System.nanoTime())/1_000_000_000, 5);
-            //System.out.print("\t" + cleanTime);
-            time = -System.nanoTime();
-            g.removeAllNodes(p.getSafeToDeleteDigraphNodes(true));
-            double diGraphTime = utils.round((double) (time+System.nanoTime())/1_000_000_000, 5);
-            //System.out.print("\t" + diGraphTime);
-            time = -System.nanoTime();
-            int newPacking = p.newFindCyclePacking(4,2, 5_000).size();
-            double newTime = utils.round((double) (time+System.nanoTime())/1_000_000_000, 5);
-            System.out.println("\t" + newPacking + "\t" + newTime);
-        }
-    }
 
     public void safeDeletionDigraph() {
 
@@ -104,21 +77,6 @@ public class Packing {
         return newFindCyclePacking(Integer.MAX_VALUE - 100, Integer.MAX_VALUE - 100, Integer.MAX_VALUE - 100);
     }
 
-    public List<Deque<Integer>> findCyclePacking() {
-        graph.addStackCheckpoint();
-        List<Deque<Integer>> costlySubGraphs = new ArrayList<>();
-        Deque<Integer> cycle = graph.findBestCycle();
-        while (cycle != null && !cycle.isEmpty()) {
-            costlySubGraphs.add(cycle);
-            for (Integer i : cycle) {
-                graph.removeNode(i);
-            }
-            cycle = graph.findBestCycle();
-        }
-        graph.rebuildGraph();
-        return costlySubGraphs;
-    }
-
     public List<Deque<Integer>> newFindCyclePacking(int limit, int sameCycleCount, int packingLimit) {
         graph.addStackCheckpoint();
         int kBefore = graph.k;
@@ -161,15 +119,6 @@ public class Packing {
         graph.rebuildGraph();
         return digraphs;
     }
-
-    public int lowerDigraphBound() {
-        int lowerBound = 0;
-        for (Set<Integer> struct : digraphs) {
-            lowerBound += struct.size() - 1;
-        }
-        return lowerBound;
-    }
-
 
     private Set<Integer> expand(Integer start) {
         Set<Integer> digraph = new HashSet<>();
