@@ -1,39 +1,14 @@
 package Utilities;
 
-import java.io.*;
-import java.util.*;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class utils {
-
-    public static void MapToJSON(Map<String, List<Long>> map, String PATH) {
-        try {
-            BufferedWriter bw = new BufferedWriter(new FileWriter(PATH));
-            bw.write("{");
-            int keySize = map.keySet().size();
-            Iterator<String> keyIterator = map.keySet().iterator();
-            for (int j = 0; j < keySize - 1; j++) {
-                String s = keyIterator.next();
-                bw.write("\"" + s + "\":[");
-                List<Long> list = map.get(s);
-                int size = map.get(s).size();
-                for (int i = 0; i < size - 1; i++) {
-                    bw.write("" + list.get(i) / (10 ^ 9) + ",");
-                }
-                bw.write("" + list.get(size - 1) / (10 ^ 9) + "],");
-            }
-            String s = keyIterator.next();
-            bw.write("\"" + s + "\":[");
-            List<Long> list = map.get(s);
-            int size = map.get(s).size();
-            for (int i = 0; i < size - 1; i++) {
-                bw.write("" + list.get(i) / (10 ^ 9) + ",");
-            }
-            bw.write("" + list.get(size - 1) / (10 ^ 9) + "]}");
-            bw.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 
     public static double round(double value, int places) {
         if (places < 0) throw new IllegalArgumentException();
@@ -135,10 +110,10 @@ public class utils {
         return null;
     }
 
-    public static Map<String, List<Integer>> loadSolutions() {
+    public static Map<String, List<Integer>> loadSolutions(String path) {
         Map<String, List<Integer>> res = new HashMap<>();
         try {
-            BufferedReader br = new BufferedReader(new FileReader("graph-metadata/solutions_week2.csv"));
+            BufferedReader br = new BufferedReader(new FileReader(path));
             br.readLine(); // skip column name line
 
             String line = br.readLine();
@@ -156,23 +131,6 @@ public class utils {
                 line = br.readLine();
             }
 
-            br = new BufferedReader(new FileReader("graph-metadata/week5_small_sol.csv"));
-            br.readLine(); // skip column name line
-
-            line = br.readLine();
-
-            while (line != null) {
-                String s = line.substring(line.lastIndexOf(';') + 1);
-                String name = line.substring(0, line.indexOf(';'));
-                s = s.replace("[", "").replace("]", "");
-                String[] splits = s.split(", ");
-                List<Integer> sol = new ArrayList<>();
-                for (String split : splits) {
-                    sol.add(Integer.valueOf(split));
-                }
-                res.put(name, sol);
-                line = br.readLine();
-            }
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -181,7 +139,7 @@ public class utils {
     }
 
     public static double getSeconds(long timestamp, int decimals) {
-        return utils.round((double)(timestamp + System.nanoTime())/1_000_000_000, decimals);
+        return utils.round((double) (timestamp + System.nanoTime()) / 1_000_000_000, decimals);
     }
 
 }
