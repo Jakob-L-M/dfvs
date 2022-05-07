@@ -33,14 +33,12 @@ public class DataCreation {
         env.set(GRB.DoubleParam.TimeLimit, timelimit);
         env.start();
 
-        BufferedWriter bw = new BufferedWriter(new FileWriter("graph-metadata/nodeData.csv"));
+        BufferedWriter bw = new BufferedWriter(new FileWriter("graph-metadata/solutions_v4.csv"));
         bw.write("instance;solution\n");
 
         for (File file : Objects.requireNonNull(new File("instances/instances/").listFiles())) {
 
             String instance = file.getPath();
-
-            if (!instance.contains("_s")) continue;
 
             DirectedGraph graph = new DirectedGraph(instance);
             graph.k = Integer.MAX_VALUE;
@@ -48,12 +46,13 @@ public class DataCreation {
 
             Packing p = new Packing(graph);
             graph.removeAllNodes(p.getSafeToDeleteDigraphNodes(true));
+            graph.cleanGraph();
 
             if (graph.size() == 0) continue;
 
             graph.createTopoLPFile("temp.lp");
 
-            List<Integer> sol = ilp("temp.lp", 60.0);
+            List<Integer> sol = ilp("temp.lp", 120.0);
 
             if (sol == null) {
                 System.out.println("Timeout for " + graph.name);
@@ -69,6 +68,7 @@ public class DataCreation {
 
             //findMoreSolutions(graph, sol, bw, env);
         }
+        bw.close();
     }
 
     private static void findMoreSolutions(DirectedGraph graph, List<Integer> sol, BufferedWriter bw, GRBEnv env) throws IOException {
@@ -182,9 +182,9 @@ public class DataCreation {
     }
 
     private static void nodesMeta() throws IOException {
-        String fileToSave = "./graph-metadata/nodes_v7.csv";
+        String fileToSave = "./graph-metadata/nodes_v9.csv";
 
-        Map<String, List<Integer>> solutions = utils.loadSolutions("graph-metadata/nodeData.csv");
+        Map<String, List<Integer>> solutions = utils.loadSolutions("graph-metadata/solutions_v4.csv");
 
         BufferedWriter bw = new BufferedWriter(new FileWriter(fileToSave));
 
@@ -212,6 +212,7 @@ public class DataCreation {
 
 
     public static void main(String[] args) throws GRBException, IOException {
+        createSolutions();
         nodesMeta();
     }
 }
