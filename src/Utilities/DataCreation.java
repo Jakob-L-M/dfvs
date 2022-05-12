@@ -4,24 +4,13 @@ import Graph.DirectedGraph;
 import Graph.Packing;
 import gurobi.*;
 
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
 
 public class DataCreation {
-
-    static GRBEnv env;
-
-    static {
-        try {
-            env = new GRBEnv();
-            env.set(GRB.IntParam.OutputFlag, 0);
-            double timelimit = 20.0;
-            env.set(GRB.DoubleParam.TimeLimit, timelimit);
-            env.start();
-        } catch (GRBException e) {
-            e.printStackTrace();
-        }
-    }
 
     public static void createSolutions() throws GRBException, IOException {
 
@@ -29,14 +18,20 @@ public class DataCreation {
 
         GRBEnv env = new GRBEnv();
         env.set(GRB.IntParam.OutputFlag, 0);
-        double timelimit = 60.0;
+        double timelimit = 1200.0;
         env.set(GRB.DoubleParam.TimeLimit, timelimit);
         env.start();
 
-        BufferedWriter bw = new BufferedWriter(new FileWriter("graph-metadata/solutions_v4.csv"));
+        Map<String, List<Integer>> lastSolutions = utils.loadSolutions("graph-metadata/solutions_v4.csv");
+
+        BufferedWriter bw = new BufferedWriter(new FileWriter("graph-metadata/solutions_v5.csv"));
         bw.write("instance;solution\n");
 
         for (File file : Objects.requireNonNull(new File("instances/instances/").listFiles())) {
+
+            if (lastSolutions.containsKey(file.getName()) || !file.getName().contains("_s")) {
+                continue;
+            }
 
             String instance = file.getPath();
 
@@ -50,12 +45,14 @@ public class DataCreation {
 
             if (graph.size() == 0) continue;
 
+            System.out.println("Solving: " + file.getName());
+
             graph.createTopoLPFile("temp.lp");
 
-            List<Integer> sol = ilp("temp.lp", 120.0);
+            List<Integer> sol = ilp("temp.lp", timelimit, env);
 
             if (sol == null) {
-                System.out.println("Timeout for " + graph.name);
+                System.out.println("\tTimeout for " + graph.name);
                 continue;
             }
 
@@ -64,7 +61,7 @@ public class DataCreation {
                 bw.flush();
             }
 
-            System.out.println("Created a solution for " + graph.name + " of size " + sol.size());
+            System.out.println("\tCreated a solution for " + graph.name + " of size " + sol.size());
 
             //findMoreSolutions(graph, sol, bw, env);
         }
@@ -92,7 +89,7 @@ public class DataCreation {
 
                 graph.createTopoLPFile("temp.lp");
 
-                List<Integer> tSol = ilp("temp.lp", 180.0);
+                List<Integer> tSol = ilp("temp.lp", 180.0, env);
 
                 if (tSol == null) {
                     graph.rebuildGraph();
@@ -102,7 +99,7 @@ public class DataCreation {
                 currentSol.addAll(tSol);
             }
 
-            if (currentSol.size() <= opt-1) {
+            if (currentSol.size() <= opt - 1) {
                 bw.write(graph.name + ";" + currentSol + "\n");
                 foundSols++;
             }
@@ -111,7 +108,7 @@ public class DataCreation {
         if (foundSols > 0) System.out.println("\t Found " + foundSols + " more solutions");
     }
 
-    public static List<Integer> ilp(String file, double timelimit) {
+    public static List<Integer> ilp(String file, double timelimit, GRBEnv env) {
 
         try {
             GRBModel model = new GRBModel(env, file);
@@ -171,7 +168,7 @@ public class DataCreation {
 
         List<Integer> sol = new ArrayList<>(solutions.get(name));
         for (int i = 0; i < iterations; i++) {
-            int b = new Random().nextInt(Math.max(1, sol.size()/3));
+            int b = new Random().nextInt(Math.max(1, sol.size() / 3));
             Collections.shuffle(sol);
             for (int j = 0; j < b; j++) {
                 g.removeNode(sol.get(j));
@@ -212,7 +209,8 @@ public class DataCreation {
 
 
     public static void main(String[] args) throws GRBException, IOException {
+        // Current: h_007_s5_257
         createSolutions();
-        nodesMeta();
+        // nodesMeta();
     }
 }
